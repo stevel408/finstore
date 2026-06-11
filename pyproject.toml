@@ -5,6 +5,10 @@ description = "Backend-agnostic local repository of a user's financial data"
 requires-python = ">=3.11"
 readme = "README.md"
 license = { text = "Apache-2.0" }
+authors = [
+    { name = "Steven Li", email = "steve.98@gmail.com" },
+]
+keywords = ["finance", "banking", "simplefin", "gnucash", "personal-finance", "ofx", "financial-data"]
 
 # Base = what library consumers need (e.g. the gnc-sfin-gateway OFX server).
 dependencies = [
@@ -49,6 +53,11 @@ dev = [
     "mypy>=1.10",
     "import-linter>=2.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/stevel408/finstore"
+Repository = "https://github.com/stevel408/finstore"
+"Bug Tracker" = "https://github.com/stevel408/finstore/issues"
 
 [project.scripts]
 finstore = "finstore_local.cli:main"
