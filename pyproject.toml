@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [
-    { name = "Steven Li", email = "steve.98@gmail.com" },
+    { name = "Steven Li", email = "steve98@gmail.com" },
 ]
 keywords = ["finance", "banking", "simplefin", "gnucash", "personal-finance", "ofx", "financial-data"]
 
