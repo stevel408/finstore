@@ -8,9 +8,9 @@ def run(env_file: str | None = None, json_output: bool = False) -> None:
     from finstore.storage.exceptions import CacheEmptyError
     from finstore.storage.filesystem import FilesystemStorage
     from finstore_local import logging as flog
-    from finstore_local.config import get_settings, resolve_data_dir
+    from finstore_local.config import load_settings, resolve_data_dir
 
-    settings = get_settings()
+    settings = load_settings(env_file)
     flog.configure(settings)
 
     try:

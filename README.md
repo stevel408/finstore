@@ -18,17 +18,30 @@ pipx install 'finstore[local]'
 ## Quick start
 
 ```python
-from finstore import fetch, Tenant
+import asyncio
+import time
+from pathlib import Path
+
+import httpx
+
+from finstore import Tenant, fetch
 from finstore.backends.simplefin import SimpleFINBackend, SimpleFINCredentials
 from finstore.storage.filesystem import FilesystemStorage
 
 tenant  = Tenant(id="local")
-backend = SimpleFINBackend()
-storage = FilesystemStorage(path="~/.local/share/finstore")
-creds   = SimpleFINCredentials(access_url="https://...")
+storage = FilesystemStorage(root=Path("~/.local/share/finstore").expanduser())
+creds   = SimpleFINCredentials(access_url="https://user:pass@bridge.simplefin.org/simplefin")
 
-await fetch(tenant, backend, storage, window=(dtstart_epoch, None))
-accounts = storage.list_accounts(tenant.id)
+dtstart = int(time.time()) - 90 * 86400  # last 90 days
+
+async def main() -> None:
+    async with httpx.AsyncClient() as http_client:
+        backend = SimpleFINBackend(credentials=creds, httpx_client=http_client)
+        await fetch(tenant, backend, storage, window=(dtstart, None))
+
+    accounts = storage.list_accounts(tenant.id)
+
+asyncio.run(main())
 ```
 
 ## License

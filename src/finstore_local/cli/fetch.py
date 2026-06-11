@@ -4,25 +4,8 @@ import asyncio
 import sys
 import time
 from datetime import UTC, datetime
-from typing import Any
 
 import httpx
-
-
-def _load_settings(env_file: str | None) -> Any:
-    import os
-
-    from finstore_local.config import Settings, get_settings  # noqa: F401
-
-    if env_file:
-        os.environ["ENV_FILE"] = env_file
-        from pydantic_settings import SettingsConfigDict
-
-        class _OverrideSettings(Settings):
-            model_config = SettingsConfigDict(env_file=env_file, frozen=True, extra="ignore")
-
-        return _OverrideSettings()
-    return get_settings()
 
 
 def run(env_file: str | None = None, start: str | None = None) -> None:
@@ -31,9 +14,9 @@ def run(env_file: str | None = None, start: str | None = None) -> None:
     from finstore.storage.exceptions import CacheEmptyError
     from finstore.storage.filesystem import FilesystemStorage
     from finstore_local import logging as flog
-    from finstore_local.config import resolve_data_dir
+    from finstore_local.config import load_settings, resolve_data_dir
 
-    settings = _load_settings(env_file)
+    settings = load_settings(env_file)
     flog.configure(settings)
 
     if settings.simplefin_access_url is None:

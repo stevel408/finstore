@@ -29,7 +29,7 @@ from finstore.model import Account, Connection, StorageChunk, Transaction
 if TYPE_CHECKING:
     import httpx
 
-    from finstore.storage.filesystem import FilesystemStorage
+    from finstore.protocols import Storage
 
 
 log = logging.getLogger(__name__)
@@ -135,7 +135,7 @@ class SimpleFINBackend:
 
     async def fetch_and_persist(
         self,
-        storage: FilesystemStorage,
+        storage: Storage,
         *,
         tenant_id: str,
         dtstart_epoch: int,

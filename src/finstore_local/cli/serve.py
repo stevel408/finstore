@@ -11,9 +11,9 @@ def run(
     debug: bool = False,
 ) -> None:
     from finstore_local import logging as flog
-    from finstore_local.config import Settings, get_settings, resolve_data_dir
+    from finstore_local.config import Settings, load_settings, resolve_data_dir
 
-    settings = get_settings()
+    settings = load_settings(env_file)
     overrides: dict[str, object] = {}
     if host:
         overrides["host_bind_address"] = host

@@ -12,9 +12,9 @@ def run(
 ) -> None:
     from finstore.storage.paths import normalize_conn_id
     from finstore_local import logging as flog
-    from finstore_local.config import get_settings, resolve_data_dir
+    from finstore_local.config import load_settings, resolve_data_dir
 
-    settings = get_settings()
+    settings = load_settings(env_file)
     flog.configure(settings)
 
     try:

@@ -66,6 +66,25 @@ def get_settings() -> Settings:
     return Settings()
 
 
+def load_settings(env_file: str | None = None) -> Settings:
+    """Return settings, optionally sourced from an alternate env file.
+
+    When `env_file` is None, returns the cached singleton (same as
+    `get_settings()`). When a path is given, constructs a fresh `Settings`
+    instance that reads from that file instead of `.env`, bypassing the cache
+    so callers with different env files don't clobber each other.
+    """
+    if env_file is None:
+        return get_settings()
+
+    from pydantic_settings import SettingsConfigDict
+
+    class _EnvFileSettings(Settings):
+        model_config = SettingsConfigDict(env_file=env_file, frozen=True, extra="ignore")
+
+    return _EnvFileSettings()
+
+
 def resolve_data_dir(settings: Settings, create: bool = False) -> Path:
     """Resolve the finstore data directory.
 
@@ -91,4 +110,4 @@ def resolve_data_dir(settings: Settings, create: bool = False) -> Path:
     return data_dir
 
 
-__all__ = ["Settings", "get_settings", "resolve_data_dir"]
+__all__ = ["Settings", "get_settings", "load_settings", "resolve_data_dir"]

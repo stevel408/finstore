@@ -47,7 +47,15 @@ log = logging.getLogger(__name__)
 
 
 class FilesystemStorage:
-    """A `Storage` implementation backed by files on disk under `root`."""
+    """A `Storage` implementation backed by files on disk under `root`.
+
+    **Single-tenant only.** The `tenant_id` parameter accepted by every
+    `Storage` method is intentionally ignored — all data is written to and
+    read from the same flat layout under `root`. Passing different `tenant_id`
+    values provides no isolation; both callers will read and write the same
+    `meta.json` and account files. For multi-tenant use, construct a separate
+    `FilesystemStorage(root=per_tenant_path)` instance per tenant.
+    """
 
     def __init__(self, root: Path):
         self._root = root
