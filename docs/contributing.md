@@ -6,6 +6,7 @@
 git clone https://github.com/you/finstore
 cd finstore
 uv venv
+source .venv/bin/activate
 uv pip install -e ".[dev]"
 ```
 
@@ -31,17 +32,29 @@ ruff check src/ tests/
 mypy src/finstore src/finstore_local
 ```
 
-## CLI (with [local] extra installed)
+## Running locally
 
-```bash
-finstore fetch --start 2026-01-01
-finstore accounts
-finstore serve
-finstore validate
-finstore cache reset
+The `[dev]` extra already includes everything needed. Credentials go in `.env`
+(gitignored). At minimum, set:
+
+```
+SIMPLEFIN_ACCESS_URL=https://user:pass@bridge.simplefin.org/simplefin
 ```
 
-Credentials go in `.env` (gitignored). Copy `.env.example` to get started.
+Populate the local cache, then start the dashboard:
+
+```bash
+finstore fetch --start 2026-01-01   # pull data from SimpleFIN
+finstore serve                       # start dashboard at http://127.0.0.1:8081
+```
+
+Other commands:
+
+```bash
+finstore accounts    # list cached accounts
+finstore validate    # check cache for violations
+finstore cache reset # wipe cache (or --account <id> for one entry)
+```
 
 ---
 

@@ -44,6 +44,10 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
+## Development
+
+See [docs/contributing.md](docs/contributing.md) for setup, running tests, linting, and CLI usage.
+
 ## License
 
 Apache-2.0

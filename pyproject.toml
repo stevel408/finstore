@@ -59,6 +59,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/finstore", "src/finstore_local"]
+artifacts = ["src/finstore_local/web/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
