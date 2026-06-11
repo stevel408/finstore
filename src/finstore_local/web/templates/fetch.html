@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Fetch</h1>
+<p class="meta-line">Last successful fetch: <strong>{{ last_success_fmt }}</strong></p>
+{% if not has_access_url %}
+<div class="flash flash-error">SIMPLEFIN_ACCESS_URL is not configured. Set it in .env before fetching.</div>
+{% else %}
+<form method="POST" action="/fetch/start">
+  <button type="submit" class="btn" id="fetch-start-btn">Start Fetch</button>
+</form>
+{% endif %}
+
+<div id="fetch-status" data-job-state="{{ job.state }}" style="margin-top:1.5rem">
+  <div id="status-idle" {% if job.state != 'idle' %}class="hidden"{% endif %}>
+    <p>No fetch running.</p>
+  </div>
+  <div id="status-running" {% if job.state != 'running' %}class="hidden"{% endif %}>
+    <div class="spinner"></div> <span>Fetching from SimpleFIN&hellip;</span>
+  </div>
+  <div id="status-done" {% if job.state != 'done' %}class="hidden"{% endif %}>
+    {% if job.report %}
+    <p>&#10003; Fetch complete in {{ job.report.duration_secs }}s &mdash;
+       {{ job.report.accounts_seen }} accounts,
+       {{ job.report.txns_new }} new transactions,
+       {{ job.report.txns_duplicate }} duplicates skipped.</p>
+    {% endif %}
+  </div>
+  <div id="status-error" {% if job.state != 'error' %}class="hidden"{% endif %}>
+    <p class="error-text">Fetch failed: {{ job.error }}</p>
+  </div>
+</div>
+{% endblock %}

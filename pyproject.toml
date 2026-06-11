@@ -1,0 +1,80 @@
+[project]
+name = "finstore"
+version = "0.1.0"
+description = "Backend-agnostic local repository of a user's financial data"
+requires-python = ">=3.11"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+
+# Base = what library consumers need (e.g. the gnc-sfin-gateway OFX server).
+dependencies = [
+    "pydantic>=2",
+    "platformdirs>=4",
+]
+
+[project.optional-dependencies]
+# `pip install finstore[simplefin]` — library + SimpleFIN backend.
+simplefin = [
+    "httpx>=0.27",
+]
+
+# `pipx install 'finstore[local]'` — the self-hosted CLI + dashboard.
+# Listed explicitly rather than via self-referential "finstore[simplefin]"
+# to avoid confusing older tooling. Keep in lockstep with [simplefin] above.
+local = [
+    "httpx>=0.27",
+    "pydantic-settings>=2.2",
+    "typer>=0.12",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "itsdangerous>=2.1",
+]
+
+dev = [
+    # Inline all runtime extras so `pip install -e .[dev]` is one step.
+    "httpx>=0.27",
+    "pydantic-settings>=2.2",
+    "typer>=0.12",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "itsdangerous>=2.1",
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "pytest-httpx>=0.30",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "import-linter>=2.1",
+]
+
+[project.scripts]
+finstore = "finstore_local.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/finstore", "src/finstore_local"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: requires live SimpleFIN endpoint (set RUN_INTEGRATION=1)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/finstore", "src/finstore_local"]

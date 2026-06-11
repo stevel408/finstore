@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Validate Cache</h1>
+
+{% if not violations %}
+<div class="callout callout-success">
+  Cache is clean — no violations found.
+</div>
+{% else %}
+<div class="callout callout-danger">
+  {{ violations | length }} violation(s) found.
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Institution</th>
+      <th>Account</th>
+      <th>Rule</th>
+      <th>Message</th>
+      <th>Txn ID</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for v in violations %}
+    <tr>
+      <td>{{ v.conn_id }}</td>
+      <td><code>{{ v.acctid }}</code></td>
+      <td><code>{{ v.rule }}</code></td>
+      <td>{{ v.message }}</td>
+      <td>{% if v.txn_id %}<code>{{ v.txn_id }}</code>{% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

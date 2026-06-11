@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="account-header">
+  <h2>{{ account.name }}</h2>
+  <div class="account-meta">
+    <span><strong>Balance:</strong>
+      <span class="{{ 'credit' if account.balance >= 0 else 'debit' }}">
+        {{ account.currency }} {{ account.balance }}
+      </span>
+    </span>
+    <span><strong>Balance date:</strong> {{ balance_date_fmt }}</span>
+    <span><strong>Currency:</strong> {{ account.currency }}</span>
+    <span><strong>ID:</strong> <code>{{ account.id }}</code></span>
+  </div>
+</div>
+
+<h2>Transactions ({{ transactions | length }})</h2>
+
+{% if transactions %}
+<table>
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Description</th>
+      <th>Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for txn in transactions %}
+    <tr>
+      <td>{{ fmt_epoch(txn.posted) }}</td>
+      <td>
+        {{ txn.description }}
+        {% if txn.payee and txn.payee != txn.description %}
+        <br><small style="color:#6c757d">{{ txn.payee }}</small>
+        {% endif %}
+      </td>
+      <td class="{{ 'credit' if txn.amount >= 0 else 'debit' }}">
+        {{ txn.amount }}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No transactions cached for this account.</p>
+{% endif %}
+
+<p style="margin-top:1.5rem"><a href="/accounts">&larr; Back to accounts</a></p>
+{% endblock %}

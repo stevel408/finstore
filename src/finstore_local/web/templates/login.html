@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>gnc-sfin-gateway — Unlock</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <nav>
+    <span class="nav-brand">gnc-sfin-gateway</span>
+  </nav>
+  <main class="login-wrap">
+    <div class="login-card">
+      <h2>Access Code</h2>
+      {% if flash %}
+      <div class="flash flash-{{ flash.level }}">{{ flash.message }}</div>
+      {% endif %}
+      <form method="POST" action="/login">
+        <input type="hidden" name="next" value="{{ next }}">
+        <label for="code">Enter access code</label>
+        <input id="code" type="password" name="code" autofocus autocomplete="current-password"
+               placeholder="••••" required>
+        <button type="submit" class="btn">Unlock</button>
+      </form>
+    </div>
+  </main>
+</body>
+</html>

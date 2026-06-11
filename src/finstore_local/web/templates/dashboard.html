@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+
+{% if meta is none %}
+<div class="callout">
+  No cached data — run <a href="/fetch">Fetch</a> first.
+</div>
+{% else %}
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-value">{{ account_count }}</div>
+    <div class="stat-label">Accounts</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ institution_count }}</div>
+    <div class="stat-label">Institutions</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ total_txns }}</div>
+    <div class="stat-label">Transactions</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value" style="font-size:1rem;font-weight:500;">{{ last_fetch }}</div>
+    <div class="stat-label">Last Fetched</div>
+  </div>
+</div>
+
+<p>
+  <a href="/accounts">View accounts</a> &middot;
+  <a href="/fetch">Fetch now</a> &middot;
+  <a href="/validate">Validate cache</a>
+</p>
+{% endif %}
+{% endblock %}

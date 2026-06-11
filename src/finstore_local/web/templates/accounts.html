@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Accounts</h1>
+
+{% if accounts %}
+<table>
+  <thead>
+    <tr>
+      <th>Institution</th>
+      <th>Account Name</th>
+      <th>Display ID</th>
+      <th>Currency</th>
+      <th>Transactions</th>
+      <th>Last Fetched</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in accounts %}
+    <tr>
+      <td>{{ item.stub.connection.org_name }}</td>
+      <td>
+        {% if item.stub.display_id %}
+        <a href="/accounts/{{ item.stub.display_id }}">{{ item.stub.name }}</a>
+        {% else %}
+        <a href="/accounts/{{ item.stub.acctid }}">{{ item.stub.name }}</a>
+        {% endif %}
+      </td>
+      <td><code>{{ item.stub.display_id or item.stub.acctid }}</code></td>
+      <td>{{ item.stub.currency }}</td>
+      <td>{{ item.stub.txn_count }}</td>
+      <td>{{ item.last_fetch_fmt }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="callout">
+  No accounts in cache. <a href="/fetch">Fetch</a> data first.
+</div>
+{% endif %}
+{% endblock %}
