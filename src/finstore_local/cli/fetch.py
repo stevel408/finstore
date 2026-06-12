@@ -13,21 +13,28 @@ def run(env_file: str | None = None, start: str | None = None) -> None:
     from finstore.backends.simplefin import SimpleFINBackend, SimpleFINCredentials
     from finstore.storage.exceptions import CacheEmptyError
     from finstore.storage.filesystem import FilesystemStorage
+    from finstore_local import credentials
     from finstore_local import logging as flog
     from finstore_local.config import load_settings, resolve_data_dir
 
     settings = load_settings(env_file)
     flog.configure(settings)
 
-    if settings.simplefin_access_url is None:
+    data_dir = resolve_data_dir(settings, create=True)
+
+    access_url = (
+        settings.simplefin_access_url.get_secret_value()
+        if settings.simplefin_access_url
+        else credentials.load(data_dir)
+    )
+    if access_url is None:
         print(
-            "ERROR: SIMPLEFIN_ACCESS_URL is required for 'fetch'.\n"
-            "Set it in .env or pass it as an environment variable.",
+            "ERROR: no credentials found.\n"
+            "Run 'finstore setup <token>' to configure, or 'finstore setup --demo' for demo data.",
             file=sys.stderr,
         )
         raise SystemExit(2)
 
-    data_dir = resolve_data_dir(settings, create=True)
     storage = FilesystemStorage(root=data_dir)
     tenant = Tenant(id="local")
 
@@ -54,9 +61,7 @@ def run(env_file: str | None = None, start: str | None = None) -> None:
         except CacheEmptyError:
             dtstart_epoch = now_epoch - 90 * 86400
 
-    creds = SimpleFINCredentials(
-        access_url=settings.simplefin_access_url.get_secret_value()
-    )
+    creds = SimpleFINCredentials(access_url=access_url)
 
     async def _run() -> None:
         async with httpx.AsyncClient(

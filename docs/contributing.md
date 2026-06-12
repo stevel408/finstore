@@ -34,12 +34,18 @@ mypy src/finstore src/finstore_local
 
 ## Running locally
 
-The `[dev]` extra already includes everything needed. Credentials go in `.env`
-(gitignored). At minimum, set:
+The `[dev]` extra already includes everything needed.
 
+**First-time setup** — exchange a SimpleFIN setup token for an access URL:
+
+```bash
+finstore setup <your-setup-token>   # real account
+finstore setup --demo               # fictional demo data, no account needed
 ```
-SIMPLEFIN_ACCESS_URL=https://user:pass@bridge.simplefin.org/simplefin
-```
+
+The access URL is saved to `{data_dir}/credentials.json` (not `.env`). You can
+also override it at any time by setting `SIMPLEFIN_ACCESS_URL` in `.env`, which
+takes priority over the saved file.
 
 Populate the local cache, then start the dashboard:
 

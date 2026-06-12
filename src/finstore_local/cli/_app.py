@@ -9,6 +9,17 @@ app.add_typer(cache_app, name="cache")
 
 
 @app.command()
+def setup(
+    token: str = typer.Argument(None, help="Setup token from SimpleFIN (base64)"),
+    demo: bool = typer.Option(False, "--demo", help="Use SimpleFIN demo credentials"),
+    env_file: str = typer.Option(None, "--env-file", help="Path to .env file"),
+) -> None:
+    """Exchange a SimpleFIN setup token for an access URL and save it locally."""
+    from finstore_local.cli.setup import run
+    run(token=token, demo=demo, env_file=env_file)
+
+
+@app.command()
 def fetch(
     env_file: str = typer.Option(None, "--env-file", help="Path to .env file"),
     start: str = typer.Option(None, "--start", help="Start date YYYY-MM-DD (backfill)"),
