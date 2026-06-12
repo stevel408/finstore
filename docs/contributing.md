@@ -159,6 +159,10 @@ design-for-cloud contract. Always pass `tenant.id` through; never hardcode
 - Use `pytest-httpx` to mock the SimpleFIN HTTP layer in backend tests; never
   hit the real `bridge.simplefin.org` in unit tests.
 
+## Publishing
+
+See [docs/publishing.md](publishing.md) for the full release checklist.
+
 ## Versioning
 
 finstore follows semantic versioning.
