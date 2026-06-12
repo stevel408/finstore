@@ -75,6 +75,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
     "integration: requires live SimpleFIN endpoint (set RUN_INTEGRATION=1)",
+    "e2e: full CLI smoke tests against real network (set RUN_E2E=1)",
 ]
 
 [tool.ruff]

@@ -21,9 +21,14 @@ pytest tests/unit/
 # Architecture invariant tests (AST-walking import rules)
 pytest tests/arch/
 
-# All tests
-pytest tests/
+# All unit + arch tests
+pytest tests/unit/ tests/arch/
+
+# End-to-end smoke tests (requires network; hits real SimpleFIN demo)
+RUN_E2E=1 pytest tests/e2e/ -v
 ```
+
+See [docs/testing.md](testing.md) for a full description of the three test layers and their conventions.
 
 ## Linting and type checking
 
