@@ -18,5 +18,6 @@ if [[ -z "${PYPI_TOKEN:-}" ]]; then
 fi
 
 cd "$ROOT"
+rm -rf dist/
 uv build
 uv publish --token "$PYPI_TOKEN"
