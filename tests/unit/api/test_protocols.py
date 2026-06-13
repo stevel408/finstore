@@ -40,6 +40,7 @@ class FakeStorage:
     """In-memory `Storage` impl — satisfies the protocol structurally."""
 
     chunks: list[tuple[str, StorageChunk]] = field(default_factory=list)
+    _credentials: dict[tuple[str, str], bytes] = field(default_factory=dict)
 
     def merge_chunk(self, tenant_id: str, chunk: StorageChunk) -> MergeStats:
         self.chunks.append((tenant_id, chunk))
@@ -71,6 +72,17 @@ class FakeStorage:
 
     def list_accounts(self, tenant_id: str = "local") -> tuple[AccountSummary, ...]:
         return ()
+
+    def read_backend_credential(self, tenant_id: str, backend_id: str) -> bytes | None:
+        return self._credentials.get((tenant_id, backend_id))
+
+    def write_backend_credential(
+        self, tenant_id: str, backend_id: str, data: bytes
+    ) -> None:
+        self._credentials[(tenant_id, backend_id)] = data
+
+    def exists_backend_credential(self, tenant_id: str, backend_id: str) -> bool:
+        return (tenant_id, backend_id) in self._credentials
 
 
 @dataclass(frozen=True)

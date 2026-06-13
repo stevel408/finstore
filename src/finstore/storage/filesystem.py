@@ -288,11 +288,40 @@ class FilesystemStorage:
             )
         return tuple(out)
 
+    # ------------------------------------------------- backend credential store
+
+    def read_backend_credential(self, tenant_id: str, backend_id: str) -> bytes | None:
+        """Return the persisted credential blob, or None if not yet written."""
+        path = self._credential_path(tenant_id, backend_id)
+        if not path.exists():
+            return None
+        try:
+            return path.read_bytes()
+        except OSError:
+            return None
+
+    def write_backend_credential(
+        self, tenant_id: str, backend_id: str, data: bytes
+    ) -> None:
+        """Atomically persist a credential blob with mode 0600."""
+        path = self._credential_path(tenant_id, backend_id)
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_bytes(data)
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+
+    def exists_backend_credential(self, tenant_id: str, backend_id: str) -> bool:
+        return self._credential_path(tenant_id, backend_id).exists()
+
     # -------------------------------------------------------------- internals
 
     @property
     def root(self) -> Path:
         return self._root
+
+    def _credential_path(self, tenant_id: str, backend_id: str) -> Path:
+        return self._root / "tenants" / tenant_id / "credentials" / f"{backend_id}.bin"
 
     def _account_path(self, conn_id: str, display_id: str) -> Path:
         return self._root / "accounts" / normalize_conn_id(conn_id) / f"{display_id}.json"

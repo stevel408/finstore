@@ -13,7 +13,6 @@ def run(env_file: str | None = None, start: str | None = None) -> None:
     from finstore.backends.simplefin import SimpleFINBackend, SimpleFINCredentials
     from finstore.storage.exceptions import CacheEmptyError
     from finstore.storage.filesystem import FilesystemStorage
-    from finstore_local import credentials
     from finstore_local import logging as flog
     from finstore_local.config import load_settings, resolve_data_dir
 
@@ -21,12 +20,14 @@ def run(env_file: str | None = None, start: str | None = None) -> None:
     flog.configure(settings)
 
     data_dir = resolve_data_dir(settings, create=True)
+    storage = FilesystemStorage(root=data_dir)
 
-    access_url = (
-        settings.simplefin_access_url.get_secret_value()
-        if settings.simplefin_access_url
-        else credentials.load(data_dir)
-    )
+    if settings.simplefin_access_url:
+        access_url: str | None = settings.simplefin_access_url.get_secret_value()
+    else:
+        raw = storage.read_backend_credential("local", "simplefin")
+        access_url = raw.decode() if raw is not None else None
+
     if access_url is None:
         print(
             "ERROR: no credentials found.\n"
@@ -35,7 +36,6 @@ def run(env_file: str | None = None, start: str | None = None) -> None:
         )
         raise SystemExit(2)
 
-    storage = FilesystemStorage(root=data_dir)
     tenant = Tenant(id="local")
 
     now_epoch = int(time.time())

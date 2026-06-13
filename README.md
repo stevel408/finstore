@@ -62,6 +62,7 @@ pip install 'finstore[simplefin]'   # core + SimpleFIN backend
 
 ```python
 import asyncio
+import os
 import time
 from pathlib import Path
 
@@ -73,7 +74,7 @@ from finstore.storage.filesystem import FilesystemStorage
 
 tenant  = Tenant(id="local")
 storage = FilesystemStorage(root=Path("~/.local/share/finstore").expanduser())
-creds   = SimpleFINCredentials(access_url="https://user:pass@bridge.simplefin.org/simplefin")
+creds   = SimpleFINCredentials(access_url=os.environ["SIMPLEFIN_ACCESS_URL"])
 
 dtstart = int(time.time()) - 90 * 86400  # last 90 days
 
@@ -86,6 +87,11 @@ async def main() -> None:
 
 asyncio.run(main())
 ```
+
+`SIMPLEFIN_ACCESS_URL` is obtained by exchanging a SimpleFIN setup token — see
+the [SimpleFIN developer docs](https://beta-bridge.simplefin.org/info/developers)
+for the token exchange flow. In production, inject it via your secrets manager
+or environment rather than hardcoding it.
 
 See [docs/api-reference.md](docs/api-reference.md) for the full public API.
 

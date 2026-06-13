@@ -57,9 +57,9 @@ def require_e2e() -> None:
 def test_demo_setup_saves_credentials(tmp_path: Path) -> None:
     result = _finstore("setup", "--demo", data_dir=tmp_path)
     assert result.returncode == 0, result.stderr
-    creds_file = tmp_path / "credentials.json"
-    assert creds_file.exists(), "credentials.json was not created"
-    assert oct(creds_file.stat().st_mode)[-3:] == "600", "credentials.json is not mode 0600"
+    creds_file = tmp_path / "tenants" / "local" / "credentials" / "simplefin.bin"
+    assert creds_file.exists(), "simplefin.bin was not created"
+    assert oct(creds_file.stat().st_mode)[-3:] == "600", "simplefin.bin is not mode 0600"
 
 
 def test_demo_fetch_populates_storage(tmp_path: Path) -> None:

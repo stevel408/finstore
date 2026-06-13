@@ -74,5 +74,17 @@ class Storage(Protocol):
 
     def list_accounts(self, tenant_id: str = ...) -> tuple[AccountSummary, ...]: ...
 
+    def read_backend_credential(
+        self, tenant_id: str, backend_id: str
+    ) -> bytes | None: ...
+
+    def write_backend_credential(
+        self, tenant_id: str, backend_id: str, data: bytes
+    ) -> None: ...
+
+    def exists_backend_credential(
+        self, tenant_id: str, backend_id: str
+    ) -> bool: ...
+
 
 __all__ = ["Backend", "Credentials", "Storage"]
