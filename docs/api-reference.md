@@ -1,8 +1,38 @@
-# finstore — Public API Reference (0.1)
+# finstore — Public API Reference (0.2)
 
 Changes to anything listed here require a minor (new symbol) or major
 (changed/removed symbol) version bump and a CHANGELOG entry. Everything else
 is free to change between patch releases.
+
+---
+
+## Concepts
+
+finstore has three moving parts that you wire together:
+
+**Backend** — knows how to fetch financial data from one provider (e.g. SimpleFIN)
+and write normalized chunks into Storage. It owns the provider-specific HTTP
+client and credential. All provider details — wire formats, authentication, window
+iteration — stay inside the backend; nothing leaks out.
+
+**Storage** — knows how to persist and query the normalized data. The reference
+implementation (`FilesystemStorage`) writes JSON files to a local directory.
+Storage also persists backend credentials via `read_backend_credential` /
+`write_backend_credential`, so the same abstraction covers both financial data and
+the secrets needed to fetch it.
+
+**Tenant** — a string identity (`Tenant(id="local")` for single-user deployments)
+that scopes every Storage call. All reads and writes carry a `tenant_id`, so the
+same Storage instance can in principle hold data for multiple users without
+cross-contamination. The reference `FilesystemStorage` is single-tenant and
+currently ignores it, but the parameter must always be threaded through.
+
+**Data flow:** `activate()` exchanges a setup token for an access URL and persists
+it in Storage, returning a wired Backend. From there, `fetch()` drives the
+Backend → Storage pipeline: the backend calls the provider API, converts the
+response into neutral `finstore.model` types (the *normalization seam*), and hands
+a `StorageChunk` to `storage.merge_chunk()`. Reads (`list_accounts`,
+`read_account_window`, etc.) go directly to Storage; the backend is not involved.
 
 ---
 
@@ -59,7 +89,7 @@ disk; the in-flight chunk is dropped. No rollback is attempted.
 
 ```
 FinstoreError
-├── BackendError        # backend fetch failed (network, auth, upstream error)
+├── BackendError        # backend fetch or activation failed (network, auth, upstream)
 ├── StorageError        # storage read/write failed
 │   ├── CacheMissError          (finstore.storage)
 │   ├── CacheEmptyError         (finstore.storage)
@@ -147,8 +177,49 @@ Unit of normalized data produced by a backend and consumed by `Storage.merge_chu
 from finstore.protocols import Backend, Storage, Credentials
 ```
 
-All three are `@runtime_checkable`. See `docs/architecture.md` for the
-full method signatures and rationale.
+All three are `@runtime_checkable`.
+
+### `Backend` protocol
+
+```python
+async def fetch_and_persist(
+    self,
+    storage: Storage,
+    *,
+    tenant_id: str,
+    dtstart_epoch: int,
+    dtend_epoch: int | None = None,
+) -> Any
+```
+
+### `Storage` protocol
+
+```python
+def merge_chunk(self, tenant_id: str, chunk: StorageChunk) -> MergeStats
+def read_meta(self, tenant_id: str = ...) -> CacheMeta
+def resolve_display_id(self, tenant_id: str, display_id: str) -> str
+def read_account(self, tenant_id: str, account_id: str) -> CachedAccount
+def read_account_window(
+    self, tenant_id: str, account_id: str,
+    dtstart_epoch: int, dtend_epoch: int | None,
+) -> CachedAccount
+def list_accounts(self, tenant_id: str = ...) -> tuple[AccountSummary, ...]
+
+# Credential persistence (added 0.2.1)
+def read_backend_credential(self, tenant_id: str, backend_id: str) -> bytes | None
+def write_backend_credential(self, tenant_id: str, backend_id: str, data: bytes) -> None
+def exists_backend_credential(self, tenant_id: str, backend_id: str) -> bool
+```
+
+`backend_id` is a short namespacing string (e.g. `"simplefin"`). The protocol
+makes no assumption about the content of `data` — that is the backend's concern.
+Implementations must store data with mode 0600 (or equivalent) and atomically
+replace any prior value.
+
+### `Credentials` protocol
+
+Empty marker. Each backend defines its own frozen dataclass that satisfies it
+structurally.
 
 ---
 
@@ -167,9 +238,14 @@ from finstore.storage import (
 Reference `Storage` implementation. Single-writer invariant: only one process
 should call `merge_chunk` at a time. Reads are safe to concurrent callers.
 
-Constructor argument `root` is the storage directory (e.g.
-`~/.local/share/finstore`). The directory and `accounts/` subdirectory must
-exist before the first write; `finstore_local.config` creates them.
+On-disk layout under `root`:
+
+```
+<root>/
+  meta.json
+  accounts/<conn_id>/<display_id>.json
+  tenants/<tenant_id>/credentials/<backend_id>.bin   # credential blobs
+```
 
 ### Return types
 
@@ -214,7 +290,60 @@ exist before the first write; `finstore_local.config` creates them.
 Requires the `[simplefin]` extra (`pip install finstore[simplefin]`).
 
 ```python
-from finstore.backends.simplefin import SimpleFINBackend, SimpleFINCredentials, FetchReport
+from finstore.backends.simplefin import activate, SimpleFINBackend, SimpleFINCredentials, FetchReport
+```
+
+### `activate()` — recommended entry-point
+
+```python
+async def activate(
+    secret: str | None,
+    *,
+    storage: Storage,
+    tenant_id: str,
+    client: httpx.AsyncClient,
+) -> SimpleFINBackend
+```
+
+Obtain a `SimpleFINBackend` that is ready to fetch, handling credential
+bootstrap and persistence in one call.
+
+**`secret` semantics:**
+
+- **Non-None:** finstore auto-detects whether `secret` is a base64-encoded
+  SimpleFIN setup token (requiring a one-time HTTP exchange) or an
+  already-usable access URL, resolves it to an access URL, persists it via
+  `storage.write_backend_credential(tenant_id, "simplefin", ...)`, and returns
+  a wired backend. Any previously persisted credential is replaced.
+- **None:** load the previously persisted credential from `storage`. Raises
+  `BackendError` if none exists.
+
+On any failure (bad secret, exchange error, missing credential) raises
+`BackendError`. All internal SimpleFIN protocol details (setup token vs access
+URL) are invisible to the caller.
+
+`client` is caller-owned; `activate` neither opens nor closes it.
+
+**Typical usage in an application container:**
+
+```python
+import httpx
+from finstore.backends.simplefin import activate
+from finstore.exceptions import BackendError
+from finstore.storage.filesystem import FilesystemStorage
+
+storage = FilesystemStorage(root=data_dir)
+
+async with httpx.AsyncClient() as client:
+    # On first run, pass the opaque secret from your env/secrets manager.
+    # On subsequent runs, pass None to load the persisted credential.
+    secret = os.environ.get("SIMPLEFIN_SECRET")  # None after first activation
+    try:
+        backend = await activate(secret, storage=storage, tenant_id="local", client=client)
+    except BackendError as exc:
+        raise RuntimeError("SimpleFIN activation failed") from exc
+
+    await fetch(tenant, backend, storage, window=(dtstart, None))
 ```
 
 ### `SimpleFINCredentials`
@@ -225,31 +354,37 @@ class SimpleFINCredentials:
     access_url: str
 ```
 
-Structurally satisfies the `Credentials` marker.
+Structurally satisfies the `Credentials` marker. Pass to `SimpleFINBackend`
+directly when you already have an access URL and do not need `activate()`'s
+credential persistence (e.g. in tests).
 
 ### `SimpleFINBackend`
 
 ```python
 SimpleFINBackend(
     credentials: SimpleFINCredentials,
-    httpx_client: httpx.AsyncClient | None = None,
+    httpx_client: httpx.AsyncClient,
+    *,
+    chunk_window_days: int = 90,
+    max_retries: int = 1,
 )
 ```
 
-Satisfies the `Backend` protocol. `httpx_client` is optional; if omitted the
-backend creates and closes its own client per `fetch_and_persist` call.
+Satisfies the `Backend` protocol. Prefer `activate()` over constructing this
+directly in production code.
 
 ### `FetchReport`
 
 Returned by `fetch()` when the backend is `SimpleFINBackend`.
 
-| Field | Type |
-|---|---|
-| `chunks` | `int` |
-| `accounts_seen` | `int` |
-| `txns_new` | `int` |
-| `txns_duplicate` | `int` |
-| `errors` | `list[str]` |
+| Field | Type | Notes |
+|---|---|---|
+| `chunks` | `int` | Number of time windows fetched |
+| `accounts_seen` | `int` | |
+| `txns_new` | `int` | |
+| `txns_duplicate` | `int` | |
+| `errlist` | `tuple[tuple[str, str], ...]` | `(code, message)` pairs from SimpleFIN's error list; empty when clean |
+| `duration_secs` | `float` | |
 
 ---
 

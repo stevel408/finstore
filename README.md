@@ -60,6 +60,11 @@ pip install finstore                 # core only
 pip install 'finstore[simplefin]'   # core + SimpleFIN backend
 ```
 
+**Activating a backend** — use `activate()` to handle the SimpleFIN credential
+bootstrap in one call. It auto-detects whether the secret is a setup token
+(requiring a one-time exchange) or a ready access URL, persists the result via
+`Storage`, and returns a wired backend:
+
 ```python
 import asyncio
 import os
@@ -69,18 +74,26 @@ from pathlib import Path
 import httpx
 
 from finstore import Tenant, fetch
-from finstore.backends.simplefin import SimpleFINBackend, SimpleFINCredentials
+from finstore.backends.simplefin import activate
+from finstore.exceptions import BackendError
 from finstore.storage.filesystem import FilesystemStorage
 
 tenant  = Tenant(id="local")
 storage = FilesystemStorage(root=Path("~/.local/share/finstore").expanduser())
-creds   = SimpleFINCredentials(access_url=os.environ["SIMPLEFIN_ACCESS_URL"])
-
 dtstart = int(time.time()) - 90 * 86400  # last 90 days
 
 async def main() -> None:
     async with httpx.AsyncClient() as http_client:
-        backend = SimpleFINBackend(credentials=creds, httpx_client=http_client)
+        # Pass the secret on first run; pass None on subsequent runs to load
+        # the persisted credential from storage.
+        secret = os.environ.get("SIMPLEFIN_SECRET")
+        try:
+            backend = await activate(
+                secret, storage=storage, tenant_id=tenant.id, client=http_client
+            )
+        except BackendError as exc:
+            raise RuntimeError("SimpleFIN activation failed") from exc
+
         await fetch(tenant, backend, storage, window=(dtstart, None))
 
     accounts = storage.list_accounts(tenant.id)
@@ -88,10 +101,10 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-`SIMPLEFIN_ACCESS_URL` is obtained by exchanging a SimpleFIN setup token — see
-the [SimpleFIN developer docs](https://beta-bridge.simplefin.org/info/developers)
-for the token exchange flow. In production, inject it via your secrets manager
-or environment rather than hardcoding it.
+`SIMPLEFIN_SECRET` is the base64-encoded setup token from SimpleFIN — see the
+[SimpleFIN developer docs](https://beta-bridge.simplefin.org/info/developers)
+for how to obtain one. After the first `activate()` call the access URL is
+persisted in `storage`; subsequent calls can pass `secret=None`.
 
 See [docs/api-reference.md](docs/api-reference.md) for the full public API.
 
