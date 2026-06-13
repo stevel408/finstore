@@ -6,6 +6,7 @@ detection and exchange logic is private here; callers never see the distinction.
 from __future__ import annotations
 
 import base64
+import time
 from typing import TYPE_CHECKING
 
 from finstore.exceptions import BackendError
@@ -50,7 +51,9 @@ async def activate(
             )
         access_url = data.decode()
     else:
-        access_url = await _resolve_access_url(secret, client)
+        access_url, validated_by_exchange = await _resolve_access_url(secret, client)
+        if not validated_by_exchange:
+            await _validate_access_url(access_url, client)
         storage.write_backend_credential(tenant_id, _BACKEND_ID, access_url.encode())
 
     return SimpleFINBackend(
@@ -59,12 +62,21 @@ async def activate(
     )
 
 
-async def _resolve_access_url(secret: str, client: httpx.AsyncClient) -> str:
-    """Return an access URL from `secret`, exchanging a setup token if needed."""
+async def _resolve_access_url(
+    secret: str, client: httpx.AsyncClient
+) -> tuple[str, bool]:
+    """Return (access_url, validated_by_exchange) from `secret`.
+
+    `validated_by_exchange` is True when the URL was just produced by a
+    successful setup-token exchange (which doubles as upstream validation).
+    For an already-exchanged access URL passed directly, it is False — the
+    caller must run an explicit validation probe before persisting.
+    """
     if secret.startswith("https://"):
-        return secret
+        return secret, False
     claim_url = _decode_setup_token(secret)
-    return await _exchange_setup_token(claim_url, client)
+    access_url = await _exchange_setup_token(claim_url, client)
+    return access_url, True
 
 
 def _decode_setup_token(token: str) -> str:
@@ -98,6 +110,33 @@ async def _exchange_setup_token(claim_url: str, client: httpx.AsyncClient) -> st
     if not access_url.startswith("https://"):
         raise BackendError(f"unexpected exchange response: {access_url!r}")
     return access_url
+
+
+async def _validate_access_url(access_url: str, client: httpx.AsyncClient) -> None:
+    """Probe the access URL with an empty-window /accounts query.
+
+    Any non-2xx response (3xx, 4xx, 5xx) or transport error is converted to
+    `BackendError`. `follow_redirects=False` is explicit: a 3xx from SimpleFIN
+    would be a protocol change we want to surface, not silently follow.
+    """
+    import httpx as _httpx
+
+    now = int(time.time())
+    url = f"{access_url.rstrip('/')}/accounts"
+    try:
+        resp = await client.get(
+            url,
+            params={"start-date": now, "end-date": now},
+            follow_redirects=False,
+        )
+    except _httpx.RequestError as exc:
+        raise BackendError(
+            f"SimpleFIN access URL validation failed: {exc}"
+        ) from exc
+    if not (200 <= resp.status_code < 300):
+        raise BackendError(
+            f"SimpleFIN access URL validation failed: HTTP {resp.status_code}"
+        )
 
 
 __all__ = ["activate"]

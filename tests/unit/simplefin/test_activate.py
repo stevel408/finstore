@@ -102,10 +102,18 @@ class TestActivateWithSetupToken:
 
 
 class TestActivateWithAccessUrl:
+    """Access-URL path requires a 2xx validation probe before persistence.
+
+    See docs/plans/docker-support/07-finstore-enhancements.md §"Validation
+    before replacement".
+    """
+
     @pytest.mark.asyncio
-    async def test_persists_directly_without_exchange(
+    async def test_persists_when_probe_returns_2xx(
         self, httpx_mock: pytest.FixtureRequest
     ) -> None:
+        # Probe: GET {access_url}/accounts?start-date=...&end-date=...
+        httpx_mock.add_response(method="GET", status_code=200, json={"accounts": []})  # type: ignore[attr-defined]
         storage = _FakeStorage()
 
         async with httpx.AsyncClient() as client:
@@ -114,7 +122,10 @@ class TestActivateWithAccessUrl:
         assert storage.read_backend_credential("local", "simplefin") == _ACCESS_URL.encode()
 
     @pytest.mark.asyncio
-    async def test_replaces_existing_credential(self, httpx_mock: pytest.FixtureRequest) -> None:
+    async def test_replaces_existing_credential_on_successful_probe(
+        self, httpx_mock: pytest.FixtureRequest
+    ) -> None:
+        httpx_mock.add_response(method="GET", status_code=200, json={"accounts": []})  # type: ignore[attr-defined]
         storage = _FakeStorage()
         storage.write_backend_credential("local", "simplefin", b"old-cred")
         new_url = "https://new:cred@bridge.simplefin.org/simplefin"
@@ -123,6 +134,61 @@ class TestActivateWithAccessUrl:
             await activate(new_url, storage=storage, tenant_id="local", client=client)
 
         assert storage.read_backend_credential("local", "simplefin") == new_url.encode()
+
+    @pytest.mark.parametrize("status_code", [301, 401, 404, 503])
+    @pytest.mark.asyncio
+    async def test_non_2xx_probe_raises_and_does_not_persist(
+        self, httpx_mock: pytest.FixtureRequest, status_code: int
+    ) -> None:
+        """3xx (not followed), 4xx, 5xx all → BackendError; nothing persisted."""
+        httpx_mock.add_response(method="GET", status_code=status_code)  # type: ignore[attr-defined]
+        storage = _FakeStorage()
+
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(BackendError, match="validation failed"):
+                await activate(
+                    _ACCESS_URL, storage=storage, tenant_id="local", client=client
+                )
+
+        assert storage.read_backend_credential("local", "simplefin") is None
+
+    @pytest.mark.asyncio
+    async def test_transport_error_raises_and_does_not_persist(self) -> None:
+        """A network failure during the probe surfaces as BackendError."""
+
+        def _raise(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("simulated network failure", request=request)
+
+        transport = httpx.MockTransport(_raise)
+        storage = _FakeStorage()
+
+        async with httpx.AsyncClient(transport=transport) as client:
+            with pytest.raises(BackendError, match="validation failed"):
+                await activate(
+                    _ACCESS_URL, storage=storage, tenant_id="local", client=client
+                )
+
+        assert storage.read_backend_credential("local", "simplefin") is None
+
+    @pytest.mark.asyncio
+    async def test_failed_probe_preserves_prior_credential(
+        self, httpx_mock: pytest.FixtureRequest
+    ) -> None:
+        """Validation-before-replacement: a bad new URL must not overwrite
+        a working persisted credential."""
+        httpx_mock.add_response(method="GET", status_code=401)  # type: ignore[attr-defined]
+        storage = _FakeStorage()
+        storage.write_backend_credential("local", "simplefin", _ACCESS_URL.encode())
+        bad_url = "https://bad:cred@bridge.simplefin.org/simplefin"
+
+        async with httpx.AsyncClient() as client:
+            with pytest.raises(BackendError):
+                await activate(
+                    bad_url, storage=storage, tenant_id="local", client=client
+                )
+
+        # Prior credential is unchanged.
+        assert storage.read_backend_credential("local", "simplefin") == _ACCESS_URL.encode()
 
 
 class TestActivateWithNone:
