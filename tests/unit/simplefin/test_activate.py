@@ -37,6 +37,9 @@ class _FakeStorage:
     def exists_backend_credential(self, tenant_id: str, backend_id: str) -> bool:
         return (tenant_id, backend_id) in self._creds
 
+    def delete_backend_credential(self, tenant_id: str, backend_id: str) -> bool:
+        return self._creds.pop((tenant_id, backend_id), None) is not None
+
 
 # ---------------------------------------------------------------------------
 # _decode_setup_token

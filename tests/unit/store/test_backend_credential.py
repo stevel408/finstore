@@ -74,3 +74,34 @@ class TestExistsBackendCredential:
         storage = FilesystemStorage(root=tmp_path)
         storage.write_backend_credential("alice", "simplefin", b"x")
         assert not storage.exists_backend_credential("bob", "simplefin")
+
+
+class TestDeleteBackendCredential:
+    def test_returns_false_when_not_present(self, tmp_path: Path) -> None:
+        storage = FilesystemStorage(root=tmp_path)
+        assert storage.delete_backend_credential("local", "simplefin") is False
+
+    def test_returns_true_when_removed(self, tmp_path: Path) -> None:
+        storage = FilesystemStorage(root=tmp_path)
+        storage.write_backend_credential("local", "simplefin", b"x")
+        assert storage.delete_backend_credential("local", "simplefin") is True
+        assert not storage.exists_backend_credential("local", "simplefin")
+
+    def test_idempotent(self, tmp_path: Path) -> None:
+        storage = FilesystemStorage(root=tmp_path)
+        storage.write_backend_credential("local", "simplefin", b"x")
+        storage.delete_backend_credential("local", "simplefin")
+        # Second call must not raise; just reports "nothing to delete."
+        assert storage.delete_backend_credential("local", "simplefin") is False
+
+    def test_other_tenants_untouched(self, tmp_path: Path) -> None:
+        storage = FilesystemStorage(root=tmp_path)
+        storage.write_backend_credential("alice", "simplefin", b"a")
+        storage.write_backend_credential("bob", "simplefin", b"b")
+        storage.delete_backend_credential("alice", "simplefin")
+        assert storage.read_backend_credential("bob", "simplefin") == b"b"
+
+    def test_missing_root_returns_false(self, tmp_path: Path) -> None:
+        # Safe-on-missing-root: construction does no I/O.
+        storage = FilesystemStorage(root=tmp_path / "does-not-exist")
+        assert storage.delete_backend_credential("local", "simplefin") is False

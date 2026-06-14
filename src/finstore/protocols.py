@@ -86,5 +86,9 @@ class Storage(Protocol):
         self, tenant_id: str, backend_id: str
     ) -> bool: ...
 
+    def delete_backend_credential(
+        self, tenant_id: str, backend_id: str
+    ) -> bool: ...
+
 
 __all__ = ["Backend", "Credentials", "Storage"]

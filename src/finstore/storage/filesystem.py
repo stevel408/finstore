@@ -314,6 +314,19 @@ class FilesystemStorage:
     def exists_backend_credential(self, tenant_id: str, backend_id: str) -> bool:
         return self._credential_path(tenant_id, backend_id).exists()
 
+    def delete_backend_credential(self, tenant_id: str, backend_id: str) -> bool:
+        """Delete the persisted credential.
+
+        Returns True if a credential was deleted, False if nothing was there
+        to begin with. Missing parent directories are not an error.
+        """
+        path = self._credential_path(tenant_id, backend_id)
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            return False
+        return True
+
     # -------------------------------------------------------------- internals
 
     @property

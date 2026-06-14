@@ -84,6 +84,9 @@ class FakeStorage:
     def exists_backend_credential(self, tenant_id: str, backend_id: str) -> bool:
         return (tenant_id, backend_id) in self._credentials
 
+    def delete_backend_credential(self, tenant_id: str, backend_id: str) -> bool:
+        return self._credentials.pop((tenant_id, backend_id), None) is not None
+
 
 @dataclass(frozen=True)
 class FakeCredentials:
