@@ -11,14 +11,14 @@ As a rule of thumb: bug fixes → patch, new features → minor, breaking change
 
 ```toml
 [project]
-version = "0.2.1"
+version = "0.2.2"
 ```
 
 **2. Commit the version bump:**
 
 ```bash
 git add pyproject.toml
-git commit -m "Bump version to 0.2.1"
+git commit -m "Bump version to 0.2.2"
 ```
 
 **3. Publish to PyPI:**
@@ -37,7 +37,7 @@ add `PYPI_TOKEN=pypi-...` to your `.env`.
 ```bash
 uv venv --clear /tmp/verify-finstore
 source /tmp/verify-finstore/bin/activate
-pip install 'finstore[local]'==0.2.1
+pip install 'finstore[local]'==0.2.2
 finstore --help
 deactivate
 ```
