@@ -27,9 +27,10 @@ same Storage instance can in principle hold data for multiple users without
 cross-contamination. The reference `FilesystemStorage` is single-tenant and
 currently ignores it, but the parameter must always be threaded through.
 
-**Data flow:** `activate()` exchanges a setup token for an access URL and persists
-it in Storage, returning a wired Backend. From there, `fetch()` drives the
-Backend → Storage pipeline: the backend calls the provider API, converts the
+**Data flow:** `activate()` resolves a credential — either by exchanging a setup
+token, validating a directly supplied access URL, or loading one already persisted
+— writes it to Storage, and returns a wired Backend. From there, `fetch()` drives
+the Backend → Storage pipeline: the backend calls the provider API, converts the
 response into neutral `finstore.model` types (the *normalization seam*), and hands
 a `StorageChunk` to `storage.merge_chunk()`. Reads (`list_accounts`,
 `read_account_window`, etc.) go directly to Storage; the backend is not involved.
@@ -209,12 +210,14 @@ def list_accounts(self, tenant_id: str = ...) -> tuple[AccountSummary, ...]
 def read_backend_credential(self, tenant_id: str, backend_id: str) -> bytes | None
 def write_backend_credential(self, tenant_id: str, backend_id: str, data: bytes) -> None
 def exists_backend_credential(self, tenant_id: str, backend_id: str) -> bool
+def delete_backend_credential(self, tenant_id: str, backend_id: str) -> bool
 ```
 
 `backend_id` is a short namespacing string (e.g. `"simplefin"`). The protocol
 makes no assumption about the content of `data` — that is the backend's concern.
 Implementations must store data with mode 0600 (or equivalent) and atomically
-replace any prior value.
+replace any prior value. `delete_backend_credential` returns `True` if a
+credential existed and was removed, `False` if nothing was stored for that key.
 
 ### `Credentials` protocol
 
@@ -308,19 +311,24 @@ async def activate(
 Obtain a `SimpleFINBackend` that is ready to fetch, handling credential
 bootstrap and persistence in one call.
 
-**`secret` semantics:**
+**`secret` accepts three forms:**
 
-- **Non-None:** finstore auto-detects whether `secret` is a base64-encoded
-  SimpleFIN setup token (requiring a one-time HTTP exchange) or an
-  already-usable access URL, resolves it to an access URL, persists it via
-  `storage.write_backend_credential(tenant_id, "simplefin", ...)`, and returns
-  a wired backend. Any previously persisted credential is replaced.
-- **None:** load the previously persisted credential from `storage`. Raises
+- **Base64-encoded setup token** — the one-time token from SimpleFIN's bridge.
+  `activate` decodes it, POSTs to the claim URL to exchange it for an access
+  URL (a one-shot, irreversible operation), persists the access URL via
+  `storage.write_backend_credential`, and returns a wired backend. The exchange
+  itself serves as proof that the credential is valid, so no extra probe is made.
+- **Access URL** (`https://…`) — a previously obtained access URL supplied
+  directly (e.g. restored from a backup). `activate` first validates it with a
+  lightweight probe (GET `/accounts` with an empty time window) before
+  persisting. If the probe fails (non-2xx or network error) `BackendError` is
+  raised and the existing persisted credential is left untouched, so a bad
+  restored URL cannot overwrite a working one.
+- **`None`** — load the previously persisted credential from `storage`. Raises
   `BackendError` if none exists.
 
-On any failure (bad secret, exchange error, missing credential) raises
-`BackendError`. All internal SimpleFIN protocol details (setup token vs access
-URL) are invisible to the caller.
+On any failure raises `BackendError`. All internal SimpleFIN protocol details
+(setup token vs access URL, probe URL construction) are invisible to the caller.
 
 `client` is caller-owned; `activate` neither opens nor closes it.
 
