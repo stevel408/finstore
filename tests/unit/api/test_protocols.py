@@ -27,8 +27,16 @@ from finstore.model import (
     StorageChunk,
     Transaction,
 )
+from finstore.model import Security
 from finstore.protocols import Backend, Credentials, Storage
-from finstore.storage.types import AccountMeta, CachedAccount, CacheMeta, MergeStats
+from finstore.storage.types import (
+    AccountMeta,
+    CachedAccount,
+    CachedInvestmentAccount,
+    CacheMeta,
+    InvestmentAccountSummary,
+    MergeStats,
+)
 
 # ---------------------------------------------------------------------------
 # Fakes
@@ -71,6 +79,32 @@ class FakeStorage:
         raise NotImplementedError
 
     def list_accounts(self, tenant_id: str = "local") -> tuple[AccountSummary, ...]:
+        return ()
+
+    def read_investment_account(
+        self, tenant_id: str, account_id: str
+    ) -> CachedInvestmentAccount:
+        raise NotImplementedError
+
+    def read_investment_account_window(
+        self,
+        tenant_id: str,
+        account_id: str,
+        dtstart_epoch: int,
+        dtend_epoch: int | None,
+    ) -> CachedInvestmentAccount:
+        raise NotImplementedError
+
+    def list_investment_accounts(
+        self, tenant_id: str = "local"
+    ) -> tuple[InvestmentAccountSummary, ...]:
+        return ()
+
+    def read_securities(
+        self,
+        tenant_id: str,
+        ids: tuple[tuple[str, str], ...] | None = None,
+    ) -> tuple[Security, ...]:
         return ()
 
     def read_backend_credential(self, tenant_id: str, backend_id: str) -> bytes | None:

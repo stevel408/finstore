@@ -71,12 +71,17 @@ def create_router(
         try:
             meta = storage.read_meta("local")
             total_txns = sum(a.txn_count for a in meta.accounts.values())
+            total_positions = sum(
+                a.position_count for a in meta.investment_accounts.values()
+            )
             ctx = {
                 "meta": meta,
                 "last_fetch": _fmt_epoch(meta.last_fetch_at),
                 "account_count": len(meta.accounts),
+                "investment_account_count": len(meta.investment_accounts),
                 "institution_count": len(meta.connections),
                 "total_txns": total_txns,
+                "total_positions": total_positions,
                 "flash": flash_obj,
             }
         except CacheEmptyError:
@@ -84,8 +89,10 @@ def create_router(
                 "meta": None,
                 "last_fetch": None,
                 "account_count": 0,
+                "investment_account_count": 0,
                 "institution_count": 0,
                 "total_txns": 0,
+                "total_positions": 0,
                 "flash": flash_obj,
             }
         return templates.TemplateResponse(request, "dashboard.html", ctx)
@@ -99,8 +106,17 @@ def create_router(
             ]
         except CacheEmptyError:
             formatted = []
+        try:
+            inv_stubs = storage.list_investment_accounts("local")
+            inv_formatted = [
+                {"stub": s, "last_fetch_fmt": _fmt_epoch(s.last_fetch_at)}
+                for s in inv_stubs
+            ]
+        except CacheEmptyError:
+            inv_formatted = []
         return templates.TemplateResponse(request, "accounts.html", {
             "accounts": formatted,
+            "investment_accounts": inv_formatted,
             "flash": None,
         })
 
@@ -132,6 +148,55 @@ def create_router(
             "flash": None,
         })
 
+    @router.get("/investment-accounts/{display_id}", response_class=HTMLResponse)
+    async def investment_account_detail(
+        request: Request, display_id: str
+    ) -> _Response:
+        try:
+            cached = storage.read_investment_account("local", display_id)
+        except (CacheMissError, CacheEmptyError):
+            return templates.TemplateResponse(
+                request,
+                "dashboard.html",
+                {
+                    "meta": None,
+                    "last_fetch": None,
+                    "account_count": 0,
+                    "investment_account_count": 0,
+                    "institution_count": 0,
+                    "total_txns": 0,
+                    "total_positions": 0,
+                    "flash": {
+                        "level": "error",
+                        "message": f"Investment account not found: {display_id}",
+                    },
+                },
+                status_code=404,
+            )
+        sorted_txns = sorted(
+            cached.investment_transactions, key=lambda t: t.trade_date, reverse=True
+        )
+        securities = storage.read_securities(
+            "local",
+            ids=tuple(
+                (p.security_id_type, p.security_id)
+                for p in cached.account.positions
+            ) or None,
+        )
+        sec_map = {(s.uniqueid_type, s.uniqueid): s for s in securities}
+        return templates.TemplateResponse(
+            request,
+            "investment_account_detail.html",
+            {
+                "account": cached.account,
+                "transactions": sorted_txns,
+                "sec_map": sec_map,
+                "balance_date_fmt": _fmt_epoch(cached.account.balance_date),
+                "fmt_epoch": _fmt_epoch,
+                "flash": None,
+            },
+        )
+
     @router.get("/validate", response_class=HTMLResponse)
     async def validate(request: Request) -> HTMLResponse:
         violations = validate_cache(data_dir)
@@ -142,9 +207,12 @@ def create_router(
 
     @router.get("/fetch", response_class=HTMLResponse)
     async def fetch_page(request: Request) -> HTMLResponse:
-        has_access_url = settings.simplefin_access_url is not None
+        has_simplefin = settings.simplefin_access_url is not None
+        has_snaptrade = bool(settings.snaptrade_client_id and settings.snaptrade_consumer_key)
         return templates.TemplateResponse(request, "fetch.html", {
-            "has_access_url": has_access_url,
+            "has_any_backend": has_simplefin or has_snaptrade,
+            "has_simplefin": has_simplefin,
+            "has_snaptrade": has_snaptrade,
             "job": registry.status(),
             "last_success_fmt": _fmt_epoch(registry.last_success_at),
             "flash": None,
@@ -152,7 +220,9 @@ def create_router(
 
     @router.post("/fetch/start")
     async def fetch_start(request: Request) -> RedirectResponse:
-        if settings.simplefin_access_url is not None:
+        has_simplefin = settings.simplefin_access_url is not None
+        has_snaptrade = bool(settings.snaptrade_client_id and settings.snaptrade_consumer_key)
+        if has_simplefin or has_snaptrade:
             registry.start(data_dir, settings)
         return RedirectResponse(url="/fetch", status_code=302)
 

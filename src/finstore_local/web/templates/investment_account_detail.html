@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="account-header">
+  <h2>{{ account.name }}</h2>
+  <div class="account-meta">
+    <span><strong>Broker:</strong> {{ account.broker_id }}</span>
+    <span><strong>Currency:</strong> {{ account.currency }}</span>
+    {% if account.available_cash is not none %}
+    <span><strong>Cash:</strong> {{ account.currency }} {{ account.available_cash }}</span>
+    {% endif %}
+    <span><strong>Balance date:</strong> {{ balance_date_fmt }}</span>
+    <span><strong>ID:</strong> <code>{{ account.id }}</code></span>
+  </div>
+</div>
+
+<h2>Positions ({{ account.positions | length }})</h2>
+{% if account.positions %}
+<table>
+  <thead>
+    <tr>
+      <th>Ticker</th>
+      <th>Security</th>
+      <th>Units</th>
+      <th>Price</th>
+      <th>Market Value</th>
+      <th>Cost Basis</th>
+      <th>As of</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for pos in account.positions %}
+    {% set sec = sec_map.get((pos.security_id_type, pos.security_id)) %}
+    <tr>
+      <td>{{ sec.ticker if sec else pos.security_id }}</td>
+      <td>{{ sec.name if sec else '—' }}</td>
+      <td>{{ pos.units }}</td>
+      <td>{{ pos.unit_price }}</td>
+      <td class="credit">{{ pos.market_value }}</td>
+      <td>{{ pos.cost_basis if pos.cost_basis is not none else '—' }}</td>
+      <td>{{ fmt_epoch(pos.snapshot_date) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No positions cached for this account.</p>
+{% endif %}
+
+<h2 style="margin-top:2rem">Transactions ({{ transactions | length }})</h2>
+{% if transactions %}
+<table>
+  <thead>
+    <tr>
+      <th>Trade Date</th>
+      <th>Type</th>
+      <th>Security</th>
+      <th>Units</th>
+      <th>Price</th>
+      <th>Total</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for txn in transactions %}
+    {% set sec = sec_map.get((txn.security_id_type, txn.security_id)) if txn.security_id else none %}
+    <tr>
+      <td>{{ fmt_epoch(txn.trade_date) }}</td>
+      <td>{{ txn.trntype }}</td>
+      <td>{{ sec.ticker if sec else (txn.security_id or '—') }}</td>
+      <td>{{ txn.units if txn.units is not none else '—' }}</td>
+      <td>{{ txn.unit_price if txn.unit_price is not none else '—' }}</td>
+      <td class="{{ 'credit' if txn.total >= 0 else 'debit' }}">{{ txn.total }}</td>
+      <td>{{ txn.description }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No transactions cached for this account.</p>
+{% endif %}
+
+<p style="margin-top:1.5rem"><a href="/accounts">&larr; Back to accounts</a></p>
+{% endblock %}

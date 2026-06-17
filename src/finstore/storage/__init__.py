@@ -4,8 +4,7 @@
 protocol lives in `finstore.protocols`. Storage-layer exceptions
 (`CacheMissError`, `CacheEmptyError`, `CacheCorruptError`,
 `CacheSchemaMismatchError`) all subclass `finstore.StorageError`.
-Return value types (`CacheMeta`, `CachedAccount`, `MergeStats`,
-`AccountMeta`) live in `finstore.storage.types`.
+Return value types live in `finstore.storage.types` and are re-exported here.
 """
 from __future__ import annotations
 
@@ -19,7 +18,10 @@ from finstore.storage.filesystem import FilesystemStorage
 from finstore.storage.types import (
     AccountMeta,
     CachedAccount,
+    CachedInvestmentAccount,
     CacheMeta,
+    InvestmentAccountMeta,
+    InvestmentAccountSummary,
     MergeStats,
 )
 
@@ -27,10 +29,13 @@ __all__ = [
     "AccountMeta",
     "CacheCorruptError",
     "CacheEmptyError",
+    "CachedAccount",
+    "CachedInvestmentAccount",
     "CacheMeta",
     "CacheMissError",
     "CacheSchemaMismatchError",
-    "CachedAccount",
     "FilesystemStorage",
+    "InvestmentAccountMeta",
+    "InvestmentAccountSummary",
     "MergeStats",
 ]

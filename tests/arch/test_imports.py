@@ -116,6 +116,32 @@ def test_simplefin_models_only_imported_inside_simplefin_package() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Rule 3b: outside finstore.backends.snaptrade.*, no St-model import
+# ---------------------------------------------------------------------------
+
+
+def test_snaptrade_models_only_imported_inside_snaptrade_package() -> None:
+    snaptrade_dir = SRC_ROOT / "finstore" / "backends" / "snaptrade"
+
+    violations: list[str] = []
+    for py_file in sorted(SRC_ROOT.rglob("*.py")):
+        try:
+            py_file.relative_to(snaptrade_dir)
+        except ValueError:
+            pass
+        else:
+            continue
+        imports = _collect_imports(py_file)
+        if "finstore.backends.snaptrade.models" in imports:
+            violations.append(str(py_file.relative_to(SRC_ROOT)))
+
+    assert not violations, (
+        "finstore.backends.snaptrade.models must only be imported inside "
+        "finstore.backends.snaptrade.*. Violations:\n  " + "\n  ".join(violations)
+    )
+
+
+# ---------------------------------------------------------------------------
 # Rule 5: finstore_local.web.* may not import from gateway.*
 # ---------------------------------------------------------------------------
 

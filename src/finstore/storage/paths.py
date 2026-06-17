@@ -16,7 +16,7 @@ def normalize_conn_id(conn_id: str) -> str:
     with an underscore as a defensive measure, and falls back to "_unknown" for
     empty conn_ids.
     """
-    safe = re.sub(r"[^A-Za-z0-9._-]", "_", conn_id.strip())
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", conn_id.strip().lower())
     return safe or "_unknown"
 
 
@@ -40,4 +40,20 @@ def sanitize_account_name(name: str) -> str:
     return result
 
 
-__all__ = ["normalize_conn_id", "sanitize_account_name"]
+def infer_account_type(name: str) -> str:
+    """Heuristic account-type classification for files that lack an explicit field.
+
+    Applied only when reading schema-v4 cash-account files written before
+    ``account_type`` was persisted.  New writes always store the field explicitly.
+
+    Returns one of the ``AccountType`` string values.
+    """
+    n = name.lower()
+    if "credit" in n:
+        return "CREDITCARD"
+    if "money market" in n or "moneymrkt" in n:
+        return "MONEYMRKT"
+    return "CHECKING"
+
+
+__all__ = ["infer_account_type", "normalize_conn_id", "sanitize_account_name"]

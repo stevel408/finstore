@@ -2,6 +2,7 @@
 {% block content %}
 <h1>Accounts</h1>
 
+<h2>Cash Accounts</h2>
 {% if accounts %}
 <table>
   <thead>
@@ -10,6 +11,7 @@
       <th>Account Name</th>
       <th>Display ID</th>
       <th>Currency</th>
+      <th>Type</th>
       <th>Transactions</th>
       <th>Last Fetched</th>
     </tr>
@@ -18,15 +20,42 @@
     {% for item in accounts %}
     <tr>
       <td>{{ item.stub.connection.org_name }}</td>
-      <td>
-        {% if item.stub.display_id %}
-        <a href="/accounts/{{ item.stub.display_id }}">{{ item.stub.name }}</a>
-        {% else %}
-        <a href="/accounts/{{ item.stub.acctid }}">{{ item.stub.name }}</a>
-        {% endif %}
-      </td>
-      <td><code>{{ item.stub.display_id or item.stub.acctid }}</code></td>
+      <td><a href="/accounts/{{ item.stub.acctid }}">{{ item.stub.name }}</a></td>
+      <td><code>{{ item.stub.acctid }}</code></td>
       <td>{{ item.stub.currency }}</td>
+      <td>{{ item.stub.account_type }}</td>
+      <td>{{ item.stub.txn_count }}</td>
+      <td>{{ item.last_fetch_fmt }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="callout">No cash accounts in cache.</div>
+{% endif %}
+
+<h2 style="margin-top:2rem">Investment Accounts</h2>
+{% if investment_accounts %}
+<table>
+  <thead>
+    <tr>
+      <th>Brokerage</th>
+      <th>Account Name</th>
+      <th>Display ID</th>
+      <th>Currency</th>
+      <th>Positions</th>
+      <th>Transactions</th>
+      <th>Last Fetched</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in investment_accounts %}
+    <tr>
+      <td>{{ item.stub.connection.org_name }}</td>
+      <td><a href="/investment-accounts/{{ item.stub.acctid }}">{{ item.stub.name }}</a></td>
+      <td><code>{{ item.stub.acctid }}</code></td>
+      <td>{{ item.stub.currency }}</td>
+      <td>{{ item.stub.position_count }}</td>
       <td>{{ item.stub.txn_count }}</td>
       <td>{{ item.last_fetch_fmt }}</td>
     </tr>
@@ -35,7 +64,8 @@
 </table>
 {% else %}
 <div class="callout">
-  No accounts in cache. <a href="/fetch">Fetch</a> data first.
+  No investment accounts in cache.
+  Run <code>finstore snaptrade setup</code> then <code>finstore fetch --backend snaptrade</code>.
 </div>
 {% endif %}
 {% endblock %}

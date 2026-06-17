@@ -61,42 +61,81 @@ def get_registry() -> JobRegistry:
 
 
 async def _run_fetch(job: FetchJob, data_dir: Path, settings: Settings) -> None:
+    import json
+
     import httpx
 
     from finstore import Tenant
     from finstore.backends.simplefin import SimpleFINBackend, SimpleFINCredentials
+    from finstore.backends.snaptrade import SnapTradeBackend, SnapTradeCredentials
     from finstore.storage.filesystem import FilesystemStorage
 
     t0 = time.monotonic()
-    try:
-        creds = SimpleFINCredentials(
-            access_url=settings.simplefin_access_url.get_secret_value()  # type: ignore[union-attr]
-        )
-        storage = FilesystemStorage(root=data_dir)
-        tenant = Tenant(id="local")
-        async with httpx.AsyncClient(timeout=settings.simplefin_timeout_secs) as http:
-            backend = SimpleFINBackend(
-                credentials=creds,
-                httpx_client=http,
-                chunk_window_days=settings.chunk_window_days,
-                max_retries=settings.simplefin_max_retries,
-            )
-            dtstart = int(time.time()) - 90 * 86400
-            report = await backend.fetch_and_persist(
-                storage,
-                tenant_id=tenant.id,
-                dtstart_epoch=dtstart,
-            )
-        job.report = {
-            "chunks": report.chunks,
-            "accounts_seen": report.accounts_seen,
-            "txns_new": report.txns_new,
-            "txns_duplicate": report.txns_duplicate,
-            "duration_secs": round(time.monotonic() - t0, 1),
-            "errors": [{"code": e[0], "msg": e[1]} for e in report.errlist],
-        }
-        job.state = "done"
-        get_registry().record_success()
-    except Exception as exc:
-        job.error = str(exc)
-        job.state = "error"
+    storage = FilesystemStorage(root=data_dir)
+    tenant = Tenant(id="local")
+    dtstart = int(time.time()) - 90 * 86400
+    report: dict[str, Any] = {}
+
+    # Each backend is isolated: a failure in one never blocks the other.
+
+    # SimpleFIN
+    if settings.simplefin_access_url is not None:
+        try:
+            async with httpx.AsyncClient(timeout=settings.simplefin_timeout_secs) as http:
+                sf_backend = SimpleFINBackend(
+                    credentials=SimpleFINCredentials(
+                        access_url=settings.simplefin_access_url.get_secret_value()
+                    ),
+                    httpx_client=http,
+                    chunk_window_days=settings.chunk_window_days,
+                    max_retries=settings.simplefin_max_retries,
+                )
+                sf_report = await sf_backend.fetch_and_persist(
+                    storage, tenant_id=tenant.id, dtstart_epoch=dtstart,
+                )
+            report["simplefin"] = {
+                "chunks": sf_report.chunks,
+                "accounts_seen": sf_report.accounts_seen,
+                "txns_new": sf_report.txns_new,
+                "txns_duplicate": sf_report.txns_duplicate,
+                "errors": [{"code": e[0], "msg": e[1]} for e in sf_report.errlist],
+            }
+        except Exception as exc:
+            report["simplefin_error"] = str(exc)
+
+    # SnapTrade
+    if settings.snaptrade_client_id and settings.snaptrade_consumer_key:
+        raw = storage.read_backend_credential("local", "snaptrade")
+        if raw is not None:
+            try:
+                cred_data = json.loads(raw.decode())
+                st_creds = SnapTradeCredentials(
+                    client_id=settings.snaptrade_client_id,
+                    consumer_key=settings.snaptrade_consumer_key.get_secret_value(),
+                    user_id=cred_data["user_id"],
+                    user_secret=cred_data["user_secret"],
+                )
+                async with httpx.AsyncClient(timeout=30.0) as http:
+                    st_backend = SnapTradeBackend(
+                        credentials=st_creds,
+                        httpx_client=http,
+                        activity_window_days=settings.chunk_window_days,
+                    )
+                    st_report = await st_backend.fetch_and_persist(
+                        storage, tenant_id=tenant.id, dtstart_epoch=dtstart,
+                    )
+                report["snaptrade"] = {
+                    "accounts_seen": st_report.accounts_seen,
+                    "inv_txns_new": st_report.inv_txns_new,
+                    "positions_written": st_report.positions_written,
+                    "securities_upserted": st_report.securities_upserted,
+                }
+            except Exception as exc:
+                report["snaptrade_error"] = str(exc)
+
+    job.report = {
+        **report,
+        "duration_secs": round(time.monotonic() - t0, 1),
+    }
+    job.state = "done"
+    get_registry().record_success()

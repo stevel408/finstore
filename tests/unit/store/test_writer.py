@@ -89,7 +89,7 @@ class TestMergeChunkFresh:
         meta_path = tmp_path / "meta.json"
         assert meta_path.exists()
         meta = json.loads(meta_path.read_text())
-        assert meta["schema_version"] == 4
+        assert meta["schema_version"] == 5
         assert "Checking" in meta["accounts"]
 
     def test_merge_stats_fresh(self, tmp_path):

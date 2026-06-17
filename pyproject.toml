@@ -22,6 +22,11 @@ simplefin = [
     "httpx>=0.27",
 ]
 
+# `pip install finstore[snaptrade]` — library + SnapTrade backend.
+snaptrade = [
+    "httpx>=0.27",
+]
+
 # `pipx install 'finstore[local]'` — the self-hosted CLI + dashboard.
 # Listed explicitly rather than via self-referential "finstore[simplefin]"
 # to avoid confusing older tooling. Keep in lockstep with [simplefin] above.

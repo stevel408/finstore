@@ -10,7 +10,11 @@
 <div class="stats-grid">
   <div class="stat-card">
     <div class="stat-value">{{ account_count }}</div>
-    <div class="stat-label">Accounts</div>
+    <div class="stat-label">Cash Accounts</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ investment_account_count }}</div>
+    <div class="stat-label">Investment Accounts</div>
   </div>
   <div class="stat-card">
     <div class="stat-value">{{ institution_count }}</div>
@@ -19,6 +23,10 @@
   <div class="stat-card">
     <div class="stat-value">{{ total_txns }}</div>
     <div class="stat-label">Transactions</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ total_positions }}</div>
+    <div class="stat-label">Positions</div>
   </div>
   <div class="stat-card">
     <div class="stat-value" style="font-size:1rem;font-weight:500;">{{ last_fetch }}</div>

@@ -5,7 +5,9 @@ import typer
 
 app = typer.Typer(name="finstore", add_completion=False)
 cache_app = typer.Typer()
+snaptrade_app = typer.Typer(help="SnapTrade brokerage connection management.")
 app.add_typer(cache_app, name="cache")
+app.add_typer(snaptrade_app, name="snaptrade")
 
 
 @app.command()
@@ -23,10 +25,16 @@ def setup(
 def fetch(
     env_file: str = typer.Option(None, "--env-file", help="Path to .env file"),
     start: str = typer.Option(None, "--start", help="Start date YYYY-MM-DD (backfill)"),
+    backend: str = typer.Option(
+        None, "--backend", help="Which backend to fetch: simplefin | snaptrade"
+    ),
+    all_backends: bool = typer.Option(
+        False, "--all", help="Fetch all configured backends in sequence"
+    ),
 ) -> None:
-    """Pull data from the configured backend into local storage."""
+    """Pull data from the configured backend(s) into local storage."""
     from finstore_local.cli.fetch import run
-    run(env_file=env_file, start=start)
+    run(env_file=env_file, start=start, backend=backend, all_backends=all_backends)
 
 
 @app.command()
@@ -58,6 +66,34 @@ def validate(
     """Validate all stored account files against defined rules."""
     from finstore_local.cli.validate import run
     run(env_file=env_file)
+
+
+@snaptrade_app.command("setup")
+def snaptrade_setup(
+    env_file: str = typer.Option(None, "--env-file"),
+) -> None:
+    """Register with SnapTrade and get a brokerage connection link."""
+    from finstore_local.cli.snaptrade import run_setup
+    run_setup(env_file=env_file)
+
+
+@snaptrade_app.command("status")
+def snaptrade_status(
+    env_file: str = typer.Option(None, "--env-file"),
+) -> None:
+    """Show SnapTrade registration status and connected accounts."""
+    from finstore_local.cli.snaptrade import run_status
+    run_status(env_file=env_file)
+
+
+@snaptrade_app.command("delete")
+def snaptrade_delete(
+    env_file: str = typer.Option(None, "--env-file"),
+    yes: bool = typer.Option(False, "--yes", help="Skip confirmation prompt"),
+) -> None:
+    """Deregister the SnapTrade user and delete local credentials."""
+    from finstore_local.cli.snaptrade import run_delete
+    run_delete(env_file=env_file, yes=yes)
 
 
 @cache_app.command("reset")

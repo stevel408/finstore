@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     host_port: int = 8081  # default differs from gateway's 8080 — two UIs run side-by-side
     web_access_code: str | None = None
     web_secret_key: str = ""
+    snaptrade_client_id: str | None = None
+    snaptrade_consumer_key: SecretStr | None = None
 
     model_config = SettingsConfigDict(env_file=".env", frozen=True, extra="ignore")
 

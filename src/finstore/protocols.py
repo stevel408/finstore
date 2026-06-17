@@ -23,8 +23,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from finstore.model import AccountSummary, StorageChunk
-    from finstore.storage.types import CachedAccount, CacheMeta, MergeStats
+    from finstore.model import AccountSummary, Security, StorageChunk
+    from finstore.storage.types import (
+        CachedAccount,
+        CachedInvestmentAccount,
+        CacheMeta,
+        InvestmentAccountSummary,
+        MergeStats,
+    )
 
 
 @runtime_checkable
@@ -73,6 +79,30 @@ class Storage(Protocol):
     ) -> CachedAccount: ...
 
     def list_accounts(self, tenant_id: str = ...) -> tuple[AccountSummary, ...]: ...
+
+    def read_investment_account(
+        self,
+        tenant_id: str,
+        account_id: str,
+    ) -> CachedInvestmentAccount: ...
+
+    def read_investment_account_window(
+        self,
+        tenant_id: str,
+        account_id: str,
+        dtstart_epoch: int,
+        dtend_epoch: int | None,
+    ) -> CachedInvestmentAccount: ...
+
+    def list_investment_accounts(
+        self, tenant_id: str = ...
+    ) -> tuple[InvestmentAccountSummary, ...]: ...
+
+    def read_securities(
+        self,
+        tenant_id: str,
+        ids: tuple[tuple[str, str], ...] | None = None,
+    ) -> tuple[Security, ...]: ...
 
     def read_backend_credential(
         self, tenant_id: str, backend_id: str

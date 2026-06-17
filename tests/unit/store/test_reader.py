@@ -20,7 +20,7 @@ TENANT = "local"
 def _write_meta(
     cache_dir: Path,
     accounts: dict,
-    schema_version: int = 4,
+    schema_version: int = 5,
     connections: list | None = None,
 ) -> None:
     meta = {
@@ -28,6 +28,7 @@ def _write_meta(
         "last_fetch_at": 1700000000,
         "connections": connections or [],
         "accounts": accounts,
+        "investment_accounts": {},
     }
     (cache_dir / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
 
@@ -61,8 +62,8 @@ def _write_account(
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
     else:
         meta = {
-            "schema_version": 4, "last_fetch_at": 1700000000,
-            "connections": [], "accounts": {},
+            "schema_version": 5, "last_fetch_at": 1700000000,
+            "connections": [], "accounts": {}, "investment_accounts": {},
         }
     existing = meta.setdefault("accounts", {}).get(display_id) or {
         "last_fetch_at": 1700000000, "txn_count": 0,
@@ -187,7 +188,7 @@ class TestCacheSchemaMismatchError:
         with pytest.raises(CacheSchemaMismatchError) as exc_info:
             storage.list_accounts(TENANT)
         assert "99" in str(exc_info.value)
-        assert "4" in str(exc_info.value)
+        assert "5" in str(exc_info.value)
 
     def test_raises_on_version_zero(self, tmp_path):
         _write_meta(
