@@ -626,6 +626,31 @@ class FilesystemStorage:
             return False
         return True
 
+    def clear_cache(self, scope: str = "all") -> None:
+        """Delete cached data files, preserving credentials.
+
+        ``scope`` controls which data is removed:
+        - ``"all"``        — meta.json + accounts/ + investment/ + securities.json
+        - ``"banking"``    — meta.json + accounts/  (SimpleFIN data)
+        - ``"investment"`` — meta.json + investment/ + securities.json  (SnapTrade data)
+
+        Credentials under ``tenants/`` are never touched.
+        """
+        import shutil
+
+        self._meta_path.unlink(missing_ok=True)
+
+        if scope in ("all", "banking"):
+            accts = self._root / "accounts"
+            if accts.exists():
+                shutil.rmtree(accts)
+
+        if scope in ("all", "investment"):
+            inv = self._root / "investment"
+            if inv.exists():
+                shutil.rmtree(inv)
+            self._securities_path().unlink(missing_ok=True)
+
     # -------------------------------------------------------------- internals
 
     @property

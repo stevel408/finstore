@@ -114,6 +114,40 @@ class StActivity:
     symbol: StSymbol | None
 
 
+@dataclass(frozen=True)
+class StOptionSymbol:
+    """An options contract as returned by the orders endpoint."""
+
+    id: str
+    ticker: str                          # OCC ticker, e.g. "USO   260618P00120000"
+    option_type: str                     # "CALL" or "PUT"
+    strike_price: Decimal | None
+    expiration_date: str | None          # "YYYY-MM-DD"
+    underlying_symbol: StSymbol | None
+
+
+@dataclass(frozen=True)
+class StOrder:
+    """One order record from the ``/accounts/{id}/orders`` endpoint.
+
+    Only orders with ``status == "EXECUTED"`` represent completed transactions.
+    Either ``symbol`` (for equities/ETFs) or ``option_symbol`` (for options)
+    is set; never both.
+    """
+
+    id: str                              # brokerage_order_id
+    account_id: str
+    status: str                          # "EXECUTED", "CANCELLED", …
+    action: str                          # "BUY" or "SELL"
+    symbol: StSymbol | None              # equity / ETF
+    option_symbol: StOptionSymbol | None # option contract
+    filled_quantity: Decimal | None
+    execution_price: Decimal | None
+    time_executed: str | None            # ISO-8601 datetime
+    time_placed: str | None              # ISO-8601 datetime
+    currency: str
+
+
 # ---------------------------------------------------------------------------
 # Decode helpers
 # ---------------------------------------------------------------------------
@@ -243,4 +277,40 @@ def _decode_activity(data: dict[str, Any]) -> StActivity:
         currency=str(currency),
         description=data.get("description") or "",
         symbol=_decode_symbol(sym_raw if isinstance(sym_raw, dict) else None),
+    )
+
+
+def _decode_option_symbol(data: dict[str, Any] | None) -> StOptionSymbol | None:
+    if not data:
+        return None
+    return StOptionSymbol(
+        id=data.get("id", ""),
+        ticker=data.get("ticker") or "",
+        option_type=data.get("option_type") or "",
+        strike_price=_dec(data.get("strike_price")),
+        expiration_date=data.get("expiration_date"),
+        underlying_symbol=_decode_symbol(data.get("underlying_symbol")),
+    )
+
+
+def _decode_order(account_id: str, data: dict[str, Any]) -> StOrder:
+    sym_raw = data.get("universal_symbol")
+    opt_raw = data.get("option_symbol")
+    currency = "USD"
+    if isinstance(sym_raw, dict):
+        cur = sym_raw.get("currency") or {}
+        if isinstance(cur, dict):
+            currency = cur.get("code") or "USD"
+    return StOrder(
+        id=data.get("brokerage_order_id") or "",
+        account_id=account_id,
+        status=data.get("status") or "",
+        action=data.get("action") or "",
+        symbol=_decode_symbol(sym_raw if isinstance(sym_raw, dict) else None),
+        option_symbol=_decode_option_symbol(opt_raw if isinstance(opt_raw, dict) else None),
+        filled_quantity=_dec(data.get("filled_quantity")),
+        execution_price=_dec(data.get("execution_price")),
+        time_executed=data.get("time_executed"),
+        time_placed=data.get("time_placed"),
+        currency=currency,
     )

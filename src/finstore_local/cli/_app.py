@@ -31,10 +31,13 @@ def fetch(
     all_backends: bool = typer.Option(
         False, "--all", help="Fetch all configured backends in sequence"
     ),
+    reset: bool = typer.Option(
+        False, "--reset", help="Clear cached data before fetching (credentials are preserved)"
+    ),
 ) -> None:
     """Pull data from the configured backend(s) into local storage."""
     from finstore_local.cli.fetch import run
-    run(env_file=env_file, start=start, backend=backend, all_backends=all_backends)
+    run(env_file=env_file, start=start, backend=backend, all_backends=all_backends, reset=reset)
 
 
 @app.command()

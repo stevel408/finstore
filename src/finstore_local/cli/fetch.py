@@ -17,6 +17,7 @@ def run(
     start: str | None = None,
     backend: str | None = None,
     all_backends: bool = False,
+    reset: bool = False,
 ) -> None:
     from finstore.storage.filesystem import FilesystemStorage as _FS
     from finstore_local import logging as flog
@@ -27,6 +28,12 @@ def run(
 
     data_dir = resolve_data_dir(settings, create=True)
     storage = _FS(root=data_dir)
+
+    if reset:
+        scope = _reset_scope(backend, all_backends)
+        storage.clear_cache(scope=scope)
+        label = f"scope={scope}"
+        print(f"Cache cleared ({label}).", file=sys.stderr)
 
     now_epoch = int(time.time())
     dtstart_epoch = _resolve_start(start, now_epoch, storage)
@@ -60,6 +67,21 @@ def run(
 
     if any(r is False for r in configured):
         raise SystemExit(1)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _reset_scope(backend: str | None, all_backends: bool) -> str:
+    if all_backends or backend is None:
+        return "all"
+    if backend == "simplefin":
+        return "banking"
+    if backend == "snaptrade":
+        return "investment"
+    return "all"
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +176,7 @@ def _fetch_snaptrade(
     raw = storage.read_backend_credential("local", "snaptrade")
     if raw is None:
         print(
-            "ERROR [snaptrade]: no user credentials found. "
+            "ERROR [snaptrade]: not configured. "
             "Run 'finstore snaptrade setup' first.",
             file=sys.stderr,
         )
@@ -162,17 +184,27 @@ def _fetch_snaptrade(
 
     try:
         cred_data = json.loads(raw.decode())
-        user_id: str = cred_data["user_id"]
-        user_secret: str = cred_data["user_secret"]
-    except (json.JSONDecodeError, KeyError) as exc:
+    except json.JSONDecodeError as exc:
         print(f"ERROR [snaptrade]: credential blob is corrupt: {exc}", file=sys.stderr)
         return False
+
+    is_personal = cred_data.get("type") == "personal"
+    if is_personal:
+        user_id_val: str | None = None
+        user_secret_val: str | None = None
+    else:
+        try:
+            user_id_val = cred_data["user_id"]
+            user_secret_val = cred_data["user_secret"]
+        except KeyError as exc:
+            print(f"ERROR [snaptrade]: credential blob is corrupt: {exc}", file=sys.stderr)
+            return False
 
     creds = SnapTradeCredentials(
         client_id=client_id,
         consumer_key=consumer_key,
-        user_id=user_id,
-        user_secret=user_secret,
+        user_id=user_id_val,
+        user_secret=user_secret_val,
     )
     tenant = Tenant(id="local")
 
@@ -228,7 +260,7 @@ def _resolve_start(
             )
             raise SystemExit(2)
 
-    from finstore.storage.exceptions import CacheEmptyError
+    from finstore.storage.exceptions import CacheEmptyError, CacheSchemaMismatchError
 
     try:
         meta = storage.read_meta("local")
@@ -241,7 +273,7 @@ def _resolve_start(
                 candidates.append(inv_v.latest_trade)
         if candidates:
             return max(candidates) - 7 * 86400  # 7-day overlap
-    except CacheEmptyError:
+    except (CacheEmptyError, CacheSchemaMismatchError):
         pass
 
     return now_epoch - 90 * 86400

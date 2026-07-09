@@ -109,11 +109,12 @@ async def _run_fetch(job: FetchJob, data_dir: Path, settings: Settings) -> None:
         if raw is not None:
             try:
                 cred_data = json.loads(raw.decode())
+                is_personal = cred_data.get("type") == "personal"
                 st_creds = SnapTradeCredentials(
                     client_id=settings.snaptrade_client_id,
                     consumer_key=settings.snaptrade_consumer_key.get_secret_value(),
-                    user_id=cred_data["user_id"],
-                    user_secret=cred_data["user_secret"],
+                    user_id=None if is_personal else cred_data["user_id"],
+                    user_secret=None if is_personal else cred_data["user_secret"],
                 )
                 async with httpx.AsyncClient(timeout=30.0) as http:
                     st_backend = SnapTradeBackend(

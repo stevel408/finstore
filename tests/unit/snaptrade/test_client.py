@@ -24,14 +24,16 @@ def _make_client(httpx_client: httpx.AsyncClient) -> StClient:
 
 class TestHmacSigning:
     @pytest.mark.asyncio
-    async def test_timestamp_header_present(self, httpx_mock: HTTPXMock) -> None:
+    async def test_timestamp_in_query_params(self, httpx_mock: HTTPXMock) -> None:
+        """timestamp is a query param, not a header."""
         httpx_mock.add_response(json=[])
         async with httpx.AsyncClient() as http:
             client = _make_client(http)
             await client.get_accounts()
 
         req = httpx_mock.get_requests()[0]
-        assert "timestamp" in req.headers
+        assert "timestamp" in str(req.url)
+        assert "timestamp" not in req.headers
 
     @pytest.mark.asyncio
     async def test_signature_header_present(self, httpx_mock: HTTPXMock) -> None:
@@ -45,22 +47,24 @@ class TestHmacSigning:
 
     @pytest.mark.asyncio
     async def test_signature_is_valid_hmac(self, httpx_mock: HTTPXMock) -> None:
+        """Signature covers {content, path, query} as compact sorted JSON."""
+        import json as _json
+        from urllib.parse import urlparse
+
         httpx_mock.add_response(json=[])
         async with httpx.AsyncClient() as http:
             client = _make_client(http)
             await client.get_accounts()
 
         req = httpx_mock.get_requests()[0]
-        timestamp = req.headers["timestamp"]
-        sig = req.headers["Signature"]
+        # Use the actual query string from the URL so ordering is authoritative.
+        raw_query = urlparse(str(req.url)).query
+        sig_object = {"content": None, "path": "/api/v1/accounts", "query": raw_query}
+        sig_content = _json.dumps(sig_object, separators=(",", ":"), sort_keys=True)
         expected = base64.b64encode(
-            hmac.new(
-                b"test-consumer-key",
-                timestamp.encode(),
-                hashlib.sha256,
-            ).digest()
+            hmac.new(b"test-consumer-key", sig_content.encode(), hashlib.sha256).digest()
         ).decode()
-        assert sig == expected
+        assert req.headers["Signature"] == expected
 
     @pytest.mark.asyncio
     async def test_client_id_in_query_params(self, httpx_mock: HTTPXMock) -> None:
@@ -83,8 +87,8 @@ class TestHmacSigning:
         assert "userId=test-user" in str(req.url)
 
     @pytest.mark.asyncio
-    async def test_auth_headers_on_every_call(self, httpx_mock: HTTPXMock) -> None:
-        """Each call independently generates auth headers."""
+    async def test_signature_on_every_call(self, httpx_mock: HTTPXMock) -> None:
+        """Each call independently generates a fresh Signature header."""
         httpx_mock.add_response(json=[])
         httpx_mock.add_response(json=[])
         async with httpx.AsyncClient() as http:
@@ -95,8 +99,8 @@ class TestHmacSigning:
         reqs = httpx_mock.get_requests()
         assert len(reqs) == 2
         for req in reqs:
-            assert "timestamp" in req.headers
             assert "Signature" in req.headers
+            assert "timestamp" in str(req.url)
 
 
 class TestPagination:

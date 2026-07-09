@@ -12,10 +12,12 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 import logging
 import time
 from datetime import date, timedelta
 from typing import Any
+from urllib.parse import urlencode
 
 import httpx
 
@@ -24,18 +26,35 @@ from finstore.backends.snaptrade.models import (
     StActivity,
     StBalance,
     StBrokerageAuthorization,
+    StOrder,
     StPosition,
     _decode_account,
     _decode_activity,
     _decode_balance,
     _decode_brokerage_authorization,
+    _decode_order,
     _decode_position,
 )
 
 log = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.snaptrade.com/api/v1"
+_API_PATH_PREFIX = "/api/v1"
 _PAGE_LIMIT = 1000
+
+
+def _make_signature(
+    consumer_key: str,
+    path: str,
+    query_string: str,
+    body: dict[str, Any] | None,
+) -> str:
+    """Compute the SnapTrade HMAC-SHA256 Signature header value."""
+    sig_object = {"content": body, "path": path, "query": query_string}
+    sig_content = json.dumps(sig_object, separators=(",", ":"), sort_keys=True)
+    return base64.b64encode(
+        hmac.new(consumer_key.encode(), sig_content.encode(), hashlib.sha256).digest()
+    ).decode()
 
 
 class StClient:
@@ -51,9 +70,9 @@ class StClient:
         self,
         client_id: str,
         consumer_key: str,
-        user_id: str,
-        user_secret: str,
         httpx_client: httpx.AsyncClient,
+        user_id: str | None = None,
+        user_secret: str | None = None,
     ) -> None:
         self._client_id = client_id
         self._consumer_key = consumer_key
@@ -63,34 +82,34 @@ class StClient:
 
     # ------------------------------------------------------------------ auth
 
-    def _auth_headers(self) -> dict[str, str]:
-        """Return ``timestamp`` + ``Signature`` headers for one request."""
-        timestamp = str(int(time.time()))
-        sig = base64.b64encode(
-            hmac.new(
-                self._consumer_key.encode(),
-                timestamp.encode(),
-                hashlib.sha256,
-            ).digest()
-        ).decode()
-        return {"timestamp": timestamp, "Signature": sig}
+    def _build_params(self, extra: dict[str, str] | None = None) -> dict[str, str]:
+        """Build the full query-param dict for one request.
 
-    def _auth_params(self) -> dict[str, str]:
-        """Return per-user query params shared by all user-scoped endpoints."""
-        return {
-            "clientId": self._client_id,
-            "userId": self._user_id,
-            "userSecret": self._user_secret,
-        }
+        Order matches the official SDK: user params first, then clientId and
+        timestamp last.  userId/userSecret are omitted for personal accounts
+        (PERS- prefix clientId) where the account is identified by clientId alone.
+        """
+        timestamp = str(int(time.time()))
+        params: dict[str, str] = {}
+        if self._user_id is not None:
+            params["userId"] = self._user_id
+        if self._user_secret is not None:
+            params["userSecret"] = self._user_secret
+        params.update(extra or {})
+        params["clientId"] = self._client_id
+        params["timestamp"] = timestamp
+        return params
 
     async def _get(
         self, path: str, extra_params: dict[str, str] | None = None
     ) -> Any:
-        params = {**self._auth_params(), **(extra_params or {})}
+        params = self._build_params(extra_params)
+        full_path = f"{_API_PATH_PREFIX}{path}"
+        signature = _make_signature(self._consumer_key, full_path, urlencode(params), None)
         resp = await self._http.get(
             f"{_BASE_URL}{path}",
             params=params,
-            headers=self._auth_headers(),
+            headers={"Signature": signature},
         )
         resp.raise_for_status()
         return resp.json()
@@ -122,6 +141,11 @@ class StClient:
     async def get_positions(self, account_id: str) -> list[StPosition]:
         data = await self._get(f"/accounts/{account_id}/positions")
         return [_decode_position(account_id, p) for p in (data or [])]
+
+    async def get_account_orders(self, account_id: str) -> list[StOrder]:
+        """Fetch all orders for one account from ``/accounts/{id}/orders``."""
+        data = await self._get(f"/accounts/{account_id}/orders")
+        return [_decode_order(account_id, o) for o in (data or [])]
 
     async def get_activities(
         self,
