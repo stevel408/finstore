@@ -68,6 +68,8 @@ def create_router(
     @router.get("/", response_class=HTMLResponse)
     async def dashboard(request: Request, flash: str | None = None) -> HTMLResponse:
         flash_obj = {"level": "ok", "message": flash} if flash else None
+        has_simplefin = settings.simplefin_access_url is not None
+        has_snaptrade = bool(settings.snaptrade_client_id and settings.snaptrade_consumer_key)
         try:
             meta = storage.read_meta("local")
             total_txns = sum(a.txn_count for a in meta.accounts.values())
@@ -82,6 +84,8 @@ def create_router(
                 "institution_count": len(meta.connections),
                 "total_txns": total_txns,
                 "total_positions": total_positions,
+                "has_simplefin": has_simplefin,
+                "has_snaptrade": has_snaptrade,
                 "flash": flash_obj,
             }
         except CacheEmptyError:
@@ -93,6 +97,8 @@ def create_router(
                 "institution_count": 0,
                 "total_txns": 0,
                 "total_positions": 0,
+                "has_simplefin": has_simplefin,
+                "has_snaptrade": has_snaptrade,
                 "flash": flash_obj,
             }
         return templates.TemplateResponse(request, "dashboard.html", ctx)
@@ -135,6 +141,10 @@ def create_router(
                     "account_count": 0,
                     "institution_count": 0,
                     "total_txns": 0,
+                    "has_simplefin": settings.simplefin_access_url is not None,
+                    "has_snaptrade": bool(
+                        settings.snaptrade_client_id and settings.snaptrade_consumer_key
+                    ),
                     "flash": {"level": "error", "message": f"Account not found: {display_id}"},
                 },
                 status_code=404,
@@ -166,6 +176,10 @@ def create_router(
                     "institution_count": 0,
                     "total_txns": 0,
                     "total_positions": 0,
+                    "has_simplefin": settings.simplefin_access_url is not None,
+                    "has_snaptrade": bool(
+                        settings.snaptrade_client_id and settings.snaptrade_consumer_key
+                    ),
                     "flash": {
                         "level": "error",
                         "message": f"Investment account not found: {display_id}",

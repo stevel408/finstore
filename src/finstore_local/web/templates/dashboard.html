@@ -2,6 +2,15 @@
 {% block content %}
 <h1>Dashboard</h1>
 
+<div class="backend-list">
+  <span class="badge {{ 'badge-active' if has_simplefin else 'badge-inactive' }}">
+    <span class="badge-dot"></span>SimpleFIN{% if not has_simplefin %} (not configured){% endif %}
+  </span>
+  <span class="badge {{ 'badge-active' if has_snaptrade else 'badge-inactive' }}">
+    <span class="badge-dot"></span>SnapTrade{% if not has_snaptrade %} (not configured){% endif %}
+  </span>
+</div>
+
 {% if meta is none %}
 <div class="callout">
   No cached data — run <a href="/fetch">Fetch</a> first.
