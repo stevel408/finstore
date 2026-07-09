@@ -42,6 +42,7 @@ a `StorageChunk` to `storage.merge_chunk()`. Reads (`list_accounts`,
 ```python
 from finstore import fetch, Tenant, Window, FinstoreError
 from finstore import BackendError, StorageError, CredentialError, ValidationError
+from finstore import BACKENDS, BackendInfo, BackendStatus, backend_status
 ```
 
 ### `Tenant`
@@ -85,6 +86,38 @@ under `tenant`. Returns the backend's report object (today: `FetchReport` from
 **Cancellation:** `asyncio.CancelledError` propagates to the caller. Any
 `storage.merge_chunk()` calls that completed before cancellation are kept on
 disk; the in-flight chunk is dropped. No rollback is attempted.
+
+### Backend registry and status
+
+```python
+@dataclass(frozen=True)
+class BackendInfo:
+    id: str
+    label: str
+
+BACKENDS: tuple[BackendInfo, ...]   # every backend finstore ships, regardless of extras installed
+
+@dataclass(frozen=True)
+class BackendStatus:
+    id: str
+    label: str
+    activated: bool
+
+def backend_status(storage: Storage, tenant_id: str) -> tuple[BackendStatus, ...]
+```
+
+`backend_status()` reports, for each entry in `BACKENDS`, whether a credential
+has been persisted for `tenant_id` via `storage.exists_backend_credential()`.
+This is the one signal every backend's setup flow agrees on — `activate()`
+(SimpleFIN) and the SnapTrade setup CLI both call `storage.write_backend_credential()`
+on success — so it works uniformly across backends without importing any of
+them or their extras.
+
+`activated` reflects persisted state only. Deployment-specific overrides (e.g.
+an env var supplying a credential directly, or additional prerequisites like
+SnapTrade's partner keys) are an application concern, not finstore's — see
+`finstore_local.web.backends.backend_status()` for an example of layering
+those on top.
 
 ### Exception hierarchy
 

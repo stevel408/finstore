@@ -69,7 +69,7 @@ def create_router(
     @router.get("/", response_class=HTMLResponse)
     async def dashboard(request: Request, flash: str | None = None) -> HTMLResponse:
         flash_obj = {"level": "ok", "message": flash} if flash else None
-        backends = backend_status(settings)
+        backends = backend_status(storage, "local", settings)
         try:
             meta = storage.read_meta("local")
             total_txns = sum(a.txn_count for a in meta.accounts.values())
@@ -139,7 +139,7 @@ def create_router(
                     "account_count": 0,
                     "institution_count": 0,
                     "total_txns": 0,
-                    "backends": backend_status(settings),
+                    "backends": backend_status(storage, "local", settings),
                     "flash": {"level": "error", "message": f"Account not found: {display_id}"},
                 },
                 status_code=404,
@@ -171,7 +171,7 @@ def create_router(
                     "institution_count": 0,
                     "total_txns": 0,
                     "total_positions": 0,
-                    "backends": backend_status(settings),
+                    "backends": backend_status(storage, "local", settings),
                     "flash": {
                         "level": "error",
                         "message": f"Investment account not found: {display_id}",
@@ -213,7 +213,7 @@ def create_router(
 
     @router.get("/fetch", response_class=HTMLResponse)
     async def fetch_page(request: Request) -> HTMLResponse:
-        backends = backend_status(settings)
+        backends = backend_status(storage, "local", settings)
         configured = {b["id"] for b in backends if b["configured"]}
         return templates.TemplateResponse(request, "fetch.html", {
             "has_any_backend": bool(configured),
@@ -227,7 +227,7 @@ def create_router(
 
     @router.post("/fetch/start")
     async def fetch_start(request: Request) -> RedirectResponse:
-        if any(b["configured"] for b in backend_status(settings)):
+        if any(b["configured"] for b in backend_status(storage, "local", settings)):
             registry.start(data_dir, settings)
         return RedirectResponse(url="/fetch", status_code=302)
 
@@ -237,7 +237,7 @@ def create_router(
 
     @router.get("/api/backends")
     async def api_backends(request: Request) -> JSONResponse:
-        return JSONResponse({"backends": backend_status(settings)})
+        return JSONResponse({"backends": backend_status(storage, "local", settings)})
 
     @router.get("/cache/reset", response_class=HTMLResponse)
     async def cache_reset_get(request: Request, account: str | None = None) -> HTMLResponse:

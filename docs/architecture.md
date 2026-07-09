@@ -155,5 +155,8 @@ Python modules are not.
   with the right path. This is the credential-lookup boundary: the core never
   sees it.
 - `finstore_local.cli` — `finstore fetch / serve / accounts / validate / cache reset`
-- `finstore_local.web` — FastAPI dashboard: per-account status, fetch trigger,
-  validate, cache reset, login screen.
+- `finstore_local.web` — FastAPI dashboard: per-account status, backend
+  activation status (`finstore.backend_status()` plus deployment-specific
+  overrides — see `finstore_local.web.backends`), fetch trigger, validate,
+  cache reset, login screen. `GET /api/backends` exposes the same status
+  as JSON.
