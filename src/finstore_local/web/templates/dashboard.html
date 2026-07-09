@@ -3,12 +3,17 @@
 <h1>Dashboard</h1>
 
 <div class="backend-list">
-  <span class="badge {{ 'badge-active' if has_simplefin else 'badge-inactive' }}">
-    <span class="badge-dot"></span>SimpleFIN{% if not has_simplefin %} (not configured){% endif %}
+  {% for b in backends %}
+  {% if b.configured %}
+  <span class="badge badge-active">
+    <span class="badge-dot"></span>{{ b.label }}
   </span>
-  <span class="badge {{ 'badge-active' if has_snaptrade else 'badge-inactive' }}">
-    <span class="badge-dot"></span>SnapTrade{% if not has_snaptrade %} (not configured){% endif %}
-  </span>
+  {% else %}
+  <a class="badge badge-inactive" href="{{ b.docs_url }}" target="_blank" rel="noopener">
+    <span class="badge-dot"></span>{{ b.label }} (not configured)
+  </a>
+  {% endif %}
+  {% endfor %}
 </div>
 
 {% if meta is none %}

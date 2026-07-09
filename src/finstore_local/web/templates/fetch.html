@@ -3,7 +3,11 @@
 <h1>Fetch</h1>
 <p class="meta-line">Last successful fetch: <strong>{{ last_success_fmt }}</strong></p>
 {% if not has_any_backend %}
-<div class="flash flash-error">No backend is configured. Set SIMPLEFIN_ACCESS_URL or SNAPTRADE_CLIENT_ID / SNAPTRADE_CONSUMER_KEY in .env before fetching.</div>
+<div class="flash flash-error">
+  No backend is configured. Set up
+  {% for b in backends %}<a href="{{ b.docs_url }}" target="_blank" rel="noopener">{{ b.label }}</a>{% if not loop.last %} or {% endif %}{% endfor %}
+  before fetching.
+</div>
 {% else %}
 <form method="POST" action="/fetch/start">
   <button type="submit" class="btn" id="fetch-start-btn">Start Fetch</button>

@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 from finstore.storage.exceptions import CacheEmptyError, CacheMissError
 from finstore.storage.filesystem import FilesystemStorage
 from finstore.storage.validate import validate_cache
+from finstore_local.web.backends import backend_status
 from finstore_local.web.jobs import get_registry
 
 if TYPE_CHECKING:
@@ -68,8 +69,7 @@ def create_router(
     @router.get("/", response_class=HTMLResponse)
     async def dashboard(request: Request, flash: str | None = None) -> HTMLResponse:
         flash_obj = {"level": "ok", "message": flash} if flash else None
-        has_simplefin = settings.simplefin_access_url is not None
-        has_snaptrade = bool(settings.snaptrade_client_id and settings.snaptrade_consumer_key)
+        backends = backend_status(settings)
         try:
             meta = storage.read_meta("local")
             total_txns = sum(a.txn_count for a in meta.accounts.values())
@@ -84,8 +84,7 @@ def create_router(
                 "institution_count": len(meta.connections),
                 "total_txns": total_txns,
                 "total_positions": total_positions,
-                "has_simplefin": has_simplefin,
-                "has_snaptrade": has_snaptrade,
+                "backends": backends,
                 "flash": flash_obj,
             }
         except CacheEmptyError:
@@ -97,8 +96,7 @@ def create_router(
                 "institution_count": 0,
                 "total_txns": 0,
                 "total_positions": 0,
-                "has_simplefin": has_simplefin,
-                "has_snaptrade": has_snaptrade,
+                "backends": backends,
                 "flash": flash_obj,
             }
         return templates.TemplateResponse(request, "dashboard.html", ctx)
@@ -141,10 +139,7 @@ def create_router(
                     "account_count": 0,
                     "institution_count": 0,
                     "total_txns": 0,
-                    "has_simplefin": settings.simplefin_access_url is not None,
-                    "has_snaptrade": bool(
-                        settings.snaptrade_client_id and settings.snaptrade_consumer_key
-                    ),
+                    "backends": backend_status(settings),
                     "flash": {"level": "error", "message": f"Account not found: {display_id}"},
                 },
                 status_code=404,
@@ -176,10 +171,7 @@ def create_router(
                     "institution_count": 0,
                     "total_txns": 0,
                     "total_positions": 0,
-                    "has_simplefin": settings.simplefin_access_url is not None,
-                    "has_snaptrade": bool(
-                        settings.snaptrade_client_id and settings.snaptrade_consumer_key
-                    ),
+                    "backends": backend_status(settings),
                     "flash": {
                         "level": "error",
                         "message": f"Investment account not found: {display_id}",
@@ -221,12 +213,13 @@ def create_router(
 
     @router.get("/fetch", response_class=HTMLResponse)
     async def fetch_page(request: Request) -> HTMLResponse:
-        has_simplefin = settings.simplefin_access_url is not None
-        has_snaptrade = bool(settings.snaptrade_client_id and settings.snaptrade_consumer_key)
+        backends = backend_status(settings)
+        configured = {b["id"] for b in backends if b["configured"]}
         return templates.TemplateResponse(request, "fetch.html", {
-            "has_any_backend": has_simplefin or has_snaptrade,
-            "has_simplefin": has_simplefin,
-            "has_snaptrade": has_snaptrade,
+            "has_any_backend": bool(configured),
+            "has_simplefin": "simplefin" in configured,
+            "has_snaptrade": "snaptrade" in configured,
+            "backends": backends,
             "job": registry.status(),
             "last_success_fmt": _fmt_epoch(registry.last_success_at),
             "flash": None,
@@ -234,15 +227,17 @@ def create_router(
 
     @router.post("/fetch/start")
     async def fetch_start(request: Request) -> RedirectResponse:
-        has_simplefin = settings.simplefin_access_url is not None
-        has_snaptrade = bool(settings.snaptrade_client_id and settings.snaptrade_consumer_key)
-        if has_simplefin or has_snaptrade:
+        if any(b["configured"] for b in backend_status(settings)):
             registry.start(data_dir, settings)
         return RedirectResponse(url="/fetch", status_code=302)
 
     @router.get("/fetch/status")
     async def fetch_status(request: Request) -> JSONResponse:
         return JSONResponse(registry.status())
+
+    @router.get("/api/backends")
+    async def api_backends(request: Request) -> JSONResponse:
+        return JSONResponse({"backends": backend_status(settings)})
 
     @router.get("/cache/reset", response_class=HTMLResponse)
     async def cache_reset_get(request: Request, account: str | None = None) -> HTMLResponse:
